@@ -38,7 +38,7 @@ const AddSuppliers = () => {
                 </div>
                 <div className='mb-4'>
                     <div className="label">
-                        <span className="label-text">Supplier&apos;s Current Payables</span>
+                        <span className="label-text">Supplier's Current Payables</span>
                     </div>
                     <input type='text' className="input input-bordered input-primary w-full max-w-xs" id='payables' name='payables' value={payables} onChange={(e) => setPayables(e.target.value)} />
                 </div>
