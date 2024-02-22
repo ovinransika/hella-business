@@ -6,6 +6,7 @@ import { auth } from '@/app/firebase/config';
 const SignIn = () => {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
+    const [error, setError] = useState('');
 
     const [signInWithEmailAndPassword] = useSignInWithEmailAndPassword(auth);
 
@@ -20,10 +21,19 @@ const SignIn = () => {
             setEmail('');
             setPassword('');
 
-            // Redirect user to another page or update UI as needed
-            console.log('User:'+ res?.user.uid +' signed in successfully.');
+            // If sign-in is successful
+            if (res && res.user) {
+                // Redirect user to another page or update UI as needed
+                console.log('User:'+ res.user.uid +' signed in successfully.');
+                window.location.href = '/';
+            } else {
+                // Handle unexpected case where res or res.user is null
+                setError('Sign in failed. Please check your credentials.');
+            }
+
         } catch (error) {
             console.error('Error:', error);
+            setError('Sign in failed. Please check your credentials.'); // Set error message
         }
     };
 
@@ -33,6 +43,12 @@ const SignIn = () => {
                 <div>
                     <h2 className="mt-6 text-center text-3xl font-extrabold text-white">Sign In</h2>
                 </div>
+                {error && 
+                    <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+                        <strong className="font-bold">Error!</strong>
+                        <span className="block sm:inline">{error}</span>
+                    </div>
+                }
                 <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
                     <input type="hidden" name="remember" value="true" />
                     <div className="rounded-md shadow-sm -space-y-px">
