@@ -1,27 +1,26 @@
 'use client';
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useAuthState } from "react-firebase-hooks/auth";
 import { auth, firestore } from "@/app/firebase/config";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, setDoc } from "firebase/firestore";
 import SupplierReturns from "@/app/components/supplierReturns/page";
+import SupplierTransactions from "@/app/components/supplierTransactions/page";
 
 export default function SupplierDetails({ params }: { params: { supplierId: string } }) {
     const [user] = useAuthState(auth);
     const [supplierDetails, setSupplierDetails] = useState<any | null>(null);
-
-    //supplier orders
-    const ordersData = [
-        { date: '2023-01-01', orderBillNo: 1, orderTotal: 100, orderSummary: {itemName: 'Broom', itemQty: '2', itemRate: '10', itemTotal: '20'} },
-        { date: '2023-02-15', orderBillNo: 2, orderTotal: 150,},
-        { date: '2023-03-20', orderBillNo: 3, orderTotal: 200,},
-    ];
-
-    //Supplier Transactions
-    const transactionsData = [
-        { trasactionDate: '2023-01-01', transactionNo: 1, transactionAmount: 100, transactionType: 'Credit' },
-        { trasactionDate: '2023-02-15', transactionNo: 2, transactionAmount: 150, transactionType: 'Debit' },
-        { trasactionDate: '2023-03-20', transactionNo: 3, transactionAmount: 200, transactionType: 'Credit' },
-    ];
+    const [editModalOpen, setEditModalOpen] = useState(false);
+    const [editedSupplier, setEditedSupplier] = useState<any>({
+        name: "",
+        companyName: "",
+        contactNo: "",
+        email: "",
+        bankAccountName: "",
+        banckAccountNo: "",
+        bankName: "",
+        bankBranch: "",
+        totalDue: 0,
+    });
 
     useEffect(() => {
         if (user) {
@@ -43,6 +42,38 @@ export default function SupplierDetails({ params }: { params: { supplierId: stri
         }
     };
 
+    const handleEditModalOpen = () => {
+        setEditedSupplier(supplierDetails); // Set initial values for editing
+        setEditModalOpen(true);
+    };
+
+    const handleEditModalClose = () => {
+        setEditModalOpen(false);
+    };
+
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const { name, value } = e.target;
+        setEditedSupplier((prev: any) => ({
+            ...prev,
+            [name]: value,
+        }));
+    };
+
+    const saveEditedSupplier = async () => {
+        try {
+            if (!user || !supplierDetails) return;
+
+            const supplierRef = doc(firestore, `users/${user.uid}/Suppliers/${params.supplierId}`);
+            await setDoc(supplierRef, editedSupplier, { merge: true });
+
+            // Close the modal and refresh supplier details
+            setEditModalOpen(false);
+            getSupplier();
+        } catch (error) {
+            console.error("Error updating supplier:", error);
+        }
+    };
+
     if (!user) {
         return <div>Loading...</div>;
     }
@@ -53,14 +84,18 @@ export default function SupplierDetails({ params }: { params: { supplierId: stri
 
     return (
         <>
-        <h1 className="font-semibold text-2xl text-center">Supplier Stats Of {supplierDetails.name}</h1>
+            <h1 className="font-semibold text-2xl text-center">Supplier Stats Of {supplierDetails.name}</h1>
             <div className="mt-9">
+                <div className="flex gap-5 mb-2">
+                    <h1 className="font-semibold text-2xl">Supplier Details</h1>
+                    <button
+                        className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-1 px-2 rounded"
+                        onClick={handleEditModalOpen}
+                    >
+                        Edit Supplier
+                    </button>
+                </div>
                 <table className="table-auto border-collapse border border-black">
-                    <caption>
-                        <tr>
-                            <p>Supplier Details</p>
-                        </tr>
-                    </caption>
                     <tbody>
                         <tr className="border border-black">
                             <td className="px-4 py-2 border border-black">Name</td>
@@ -80,68 +115,180 @@ export default function SupplierDetails({ params }: { params: { supplierId: stri
                         </tr>
                         <tr className="border border-black">
                             <td className="px-4 py-2 border border-black">Total Due</td>
-                            <td className="px-4 py-2 border border-black font-semibold text-blue-600">LKR {supplierDetails.totalDue}</td>
+                            <td className="px-4 py-2 border border-black font-bold text-red-600">LKR {supplierDetails.totalDue}</td>
+                        </tr>
+                        <tr className="border border-black">
+                            <td className="px-4 py-2 border border-black">Bank Account Name</td>
+                            <td className="px-4 py-2 border border-black font-semibold text-blue-600">{supplierDetails?.bankAccountName}</td>
+                        </tr>
+                        <tr className="border border-black">
+                            <td className="px-4 py-2 border border-black">Bank Account No</td>
+                            <td className="px-4 py-2 border border-black font-semibold text-blue-600">{supplierDetails?.bankAccountNo}</td>
+                        </tr>
+                        <tr className="border border-black">
+                            <td className="px-4 py-2 border border-black">Bank Name</td>
+                            <td className="px-4 py-2 border border-black font-semibold text-blue-600">{supplierDetails?.bankName}</td>
+                        </tr>
+                        <tr className="border border-black">
+                            <td className="px-4 py-2 border border-black">Bank Branch</td>
+                            <td className="px-4 py-2 border border-black font-semibold text-blue-600">{supplierDetails?.bankBranch}</td>
                         </tr>
                     </tbody>
                 </table>
             </div>
+
             <div>
-                <SupplierReturns params={{
-                    supplierId: params.supplierId
-                }} />
+                <SupplierTransactions params={{ supplierId: params.supplierId }} />
             </div>
-            
-            <div style={{
-                borderRadius: '10px',
-            }} className="mt-10 bg-blue-700 p-10">
-            <table className="w-full">
-                <caption>Supplier Orders</caption>
-                <thead>
-                    <tr>
-                        <th className="px-4 py-2 border border-black">Order Date</th>
-                        <th className="px-4 py-2 border border-black">Order Bill No.</th>
-                        <th className="px-4 py-2 border border-black">Order Total</th>
-                        <th className="px-4 py-2 border border-black">Order Summary</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {ordersData.map((item, index) => (
-                        <tr key={index} className="border border-black">
-                            <td className="px-4 py-2 border border-black">{item.date}</td>
-                            <td className="px-4 py-2 border border-black">{item.orderBillNo}</td>
-                            <td className="px-4 py-2 border border-black">{item.orderTotal}</td>
-                            <td className="px-4 py-2 border border-black">View</td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-            </div>
-            <div style={{
-                borderRadius: '10px',
-            }} className="mt-10 bg-green-700 p-10">
-            <table className="w-full">
-                <caption>Supplier Transactions</caption>
-                <thead>
-                    <tr>
-                        <th className="px-4 py-2 border border-black">Date</th>
-                        <th className="px-4 py-2 border border-black">Transaction No.</th>
-                        <th className="px-4 py-2 border border-black">Amount</th>
-                        <th className="px-4 py-2 border border-black">Type</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {transactionsData.map((item, index) => (
-                        <tr key={index} className="border border-black">
-                            <td className="px-4 py-2 border border-black">{item.trasactionDate}</td>
-                            <td className="px-4 py-2 border border-black">{item.transactionNo}</td>
-                            <td className="px-4 py-2 border border-black">{item.transactionAmount}</td>
-                            <td className="px-4 py-2 border border-black">{item.transactionType}</td>
-                        </tr>
-                    ))}
-                </tbody>
-            </table>
-            </div>
-            
+
+            {editModalOpen && (
+                <div className="fixed inset-0 flex items-center justify-center">      
+                    <div className="absolute inset-0 bg-gray-900 opacity-75"></div>
+                    <div style={{width: '35%'}} className="z-50 bg-gray-800 p-8 rounded">
+                        <div className="flex items-center justify-between p-2">
+                            <h2 className="text-xl font-semibold mb-4">Edit Supplier</h2>
+                            <button className="btn btn-square bg-red-500 text-white" onClick={() => setEditModalOpen(false)}>X</button>
+                        </div>
+                        <div className="flex gap-14">
+                        <div>
+                            <div className="mb-4">
+                                <label htmlFor="name" className="block font-medium">
+                                    Name
+                                </label>
+                                <input
+                                    type="text"
+                                    id="name"
+                                    name="name"
+                                    value={editedSupplier.name}
+                                    onChange={handleInputChange}
+                                    className="mt-1 p-2 w-full border border-gray-300 rounded-md"
+                                />
+                            </div>
+                            <div className="mb-4">
+                                <label htmlFor="companyName" className="block font-medium">
+                                    Company Name
+                                </label>
+                                <input
+                                    type="text"
+                                    id="companyName"
+                                    name="companyName"
+                                    value={editedSupplier.companyName}
+                                    onChange={handleInputChange}
+                                    className="mt-1 p-2 w-full border border-gray-300 rounded-md"
+                                />
+                            </div>
+                            <div className="mb-4">
+                                <label htmlFor="contactNo" className="block font-medium">
+                                    Contact No
+                                </label>
+                                <input
+                                    type="text"
+                                    id="contactNo"
+                                    name="contactNo"
+                                    value={editedSupplier.contactNo}
+                                    onChange={handleInputChange}
+                                    className="mt-1 p-2 w-full border border-gray-300 rounded-md"
+                                />
+                            </div>
+                            <div className="mb-4">
+                                <label htmlFor="email" className="block font-medium">
+                                    Email
+                                </label>
+                                <input
+                                    type="text"
+                                    id="email"
+                                    name="email"
+                                    value={editedSupplier.email}
+                                    onChange={handleInputChange}
+                                    className="mt-1 p-2 w-full border border-gray-300 rounded-md"
+                                />
+                            </div>
+                            <div className="mb-4">
+                                <label htmlFor="totalDue" className="block font-medium">
+                                    Total Due
+                                </label>
+                                <input
+                                    type="number"
+                                    id="totalDue"
+                                    name="totalDue"
+                                    value={editedSupplier.totalDue}
+                                    onChange={handleInputChange}
+                                    className="mt-1 p-2 w-full border border-gray-300 rounded-md"
+                                />
+                            </div>
+                        </div>
+                        <div>
+                            <div className="mb-4">
+                                <label htmlFor="bankAccountName" className="block font-medium">
+                                    Bank Account Name
+                                </label>
+                                <input
+                                    type="text"
+                                    id="bankAccountName"
+                                    name="bankAccountName"
+                                    value={editedSupplier.bankAccountName}
+                                    onChange={handleInputChange}
+                                    className="mt-1 p-2 w-full border border-gray-300 rounded-md"
+                                />
+                            </div>
+                            <div className="mb-4">
+                                <label htmlFor="bankAccountNo" className="block font-medium">
+                                    Bank Account No
+                                </label>
+                                <input
+                                    type="text"
+                                    id="bankAccountNo"
+                                    name="bankAccountNo"
+                                    value={editedSupplier.bankAccountNo}
+                                    onChange={handleInputChange}
+                                    className="mt-1 p-2 w-full border border-gray-300 rounded-md"
+                                />
+                            </div>
+                            <div className="mb-4">
+                                <label htmlFor="bankName" className="block font-medium">
+                                    Bank Name
+                                </label>
+                                <input
+                                    type="text"
+                                    id="bankName"
+                                    name="bankName"
+                                    value={editedSupplier.bankName}
+                                    onChange={handleInputChange}
+                                    className="mt-1 p-2 w-full border border-gray-300 rounded-md"
+                                />
+                            </div>
+                            <div className="mb-4">
+                                <label htmlFor="bankBranch" className="block font-medium">
+                                    Bank Branch
+                                </label>
+                                <input
+                                    type="text"
+                                    id="bankBranch"
+                                    name="bankBranch"
+                                    value={editedSupplier.bankBranch}
+                                    onChange={handleInputChange}
+                                    className="mt-1 p-2 w-full border border-gray-300 rounded-md"
+                                />
+                            </div>
+                        </div>
+                        </div>
+                        <div className="flex justify-end">
+                            <button
+                                onClick={handleEditModalClose}
+                                className="px-4 py-2 bg-red-500 text-white rounded-md mr-2"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={saveEditedSupplier}
+                                className="px-4 py-2 bg-blue-500 text-white rounded-md"
+                            >
+                                Save
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </>
     );
 }

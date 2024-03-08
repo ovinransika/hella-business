@@ -58,7 +58,7 @@ const SupplierReturns = ({ params }: { params: { supplierId: string } }) => {
             getSupplierReturns();
 
             //close modal
-            (document.getElementById('my_modal_5') as HTMLDialogElement)?.close();
+            (document.getElementById('my_modal_4') as HTMLDialogElement)?.close();
 
             //Reload whole page
             window.location.reload();
@@ -75,7 +75,7 @@ const SupplierReturns = ({ params }: { params: { supplierId: string } }) => {
             setReturnsAmount(returnsToEdit.returnsAmount);
             setReturnsReason(returnsToEdit.returnsReason);
             setEditId(returnsId); // Set the ID for editing
-            (document.getElementById('my_modal_5') as HTMLDialogElement)?.showModal();
+            (document.getElementById('my_modal_4') as HTMLDialogElement)?.showModal();
         }
     };
 
@@ -107,7 +107,7 @@ const SupplierReturns = ({ params }: { params: { supplierId: string } }) => {
             getSupplierReturns();
 
             // Close the modal
-            (document.getElementById('my_modal_5') as HTMLDialogElement)?.close();
+            (document.getElementById('my_modal_4') as HTMLDialogElement)?.close();
 
             //Reload whole page
             window.location.reload();
@@ -167,10 +167,15 @@ const SupplierReturns = ({ params }: { params: { supplierId: string } }) => {
         <div style={{ borderRadius: '10px' }} className="mt-10 bg-red-800 p-10">
             <div className="flex justify-between mb-5">
                 <h1 className="text-2xl font-semibold mb-5">Supplier Returns</h1>
-                <button className="bg-black hover:bg-white hover:text-red-800 text-white font-bold py-2 px-4 rounded" onClick={() => (document.getElementById('my_modal_5') as HTMLDialogElement)?.showModal()}>
+                <button className="bg-black hover:bg-white hover:text-red-800 text-white font-bold py-2 px-4 rounded" onClick={() => (document.getElementById('my_modal_4') as HTMLDialogElement)?.showModal()}>
                     Add Returns
                 </button>
             </div>
+            {/* Show Table only if supplier Returns are available... If not show "There are no returns for this supplier" */}
+            {returnsData.length === 0 ? (
+                <p className="text-center font-semibold text-l">THERE ARE NO RETURNS RELATED TO THIS SUPPLIER!!!</p>
+            ) : (
+            <>
             <table className="w-full">
                 <thead>
                     <tr>
@@ -201,6 +206,9 @@ const SupplierReturns = ({ params }: { params: { supplierId: string } }) => {
                     ))}
                 </tbody>
             </table>
+            </>
+            )}
+            
             {/* Pagination */}
             <div className="mt-5">
                 {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
@@ -215,11 +223,11 @@ const SupplierReturns = ({ params }: { params: { supplierId: string } }) => {
                     </button>
                 ))}
             </div>
-            <dialog id="my_modal_5" className="modal modal-bottom sm:modal-middle">
+            <dialog id="my_modal_4" className="modal modal-bottom sm:modal-middle">
                 <div className="modal-box">
                     <div className="flex items-center justify-between p-2">
                         <h3 className="font-semibold text-xl">{editId ? 'Edit Returns' : 'Add Returns'}</h3>
-                        <button className="btn btn-square bg-red-500 text-white" onClick={() => (document.getElementById('my_modal_5') as HTMLDialogElement)?.close()}>X</button>
+                        <button className="btn btn-square bg-red-500 text-white" onClick={() => (document.getElementById('my_modal_4') as HTMLDialogElement)?.close()}>X</button>
                     </div>
                     <div>
                         <form method="dialog">
