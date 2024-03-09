@@ -36,9 +36,6 @@ const Suppliers = () => {
                     <Link href="/suppliers/addSuppliers">
                         <button className="ml-auto bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Add Supplier</button>
                     </Link>
-                    <Link href="/suppliers/newOrder">
-                        <button className="ml-4 bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded">New Order</button>
-                    </Link>
                 </div>
             </div>
             <div className="overflow-x-auto">

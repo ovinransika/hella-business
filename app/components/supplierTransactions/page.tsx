@@ -71,7 +71,11 @@ const SupplierTransactions = ({ params }: { params: { supplierId: string } }) =>
         try {
             const timestamp = new Date(); // Get the current timestamp
     
-            const transactionsRef = collection(firestore, `users/${user.uid}/Suppliers/${params.supplierId}/Transactions`);
+            if(transactionDetails.transactionNo === '' || transactionDetails.date === '' || transactionDetails.invoiceNo === '' || transactionDetails.total === '' || transactionDetails.returnNo === '' || transactionDetails.returnTotal === '' || transactionDetails.damageTotal === '' || transactionDetails.balance === '' || transactionDetails.cashChqDate === '' || transactionDetails.chqNo === '' || transactionDetails.chqIssuedBank === '' || transactionDetails.cashChqAmount === '' || transactionDetails.chqRealizeDate === '' || transactionDetails.outstandingBalance === '' ) {
+                alert('Please fill in all required fields');
+                return;
+            }else {
+                const transactionsRef = collection(firestore, `users/${user.uid}/Suppliers/${params.supplierId}/Transactions`);
             await addDoc(transactionsRef, {
                 ...transactionDetails,
                 timestamp: timestamp, // Add timestamp to the transaction
@@ -84,18 +88,20 @@ const SupplierTransactions = ({ params }: { params: { supplierId: string } }) =>
                 await setDoc(supplierRef, { totalDue: transactionDetails.outstandingBalance }, { merge: true });
             }
 
-            const chqRef = collection(firestore, `users/${user.uid}/Cheques`);
-            const supplierData = supplierDoc.data();
-            await addDoc(chqRef, {
-                chqNo: transactionDetails.chqNo,
-                chqIssuedBank: transactionDetails.chqIssuedBank,
-                chqAmount: transactionDetails.cashChqAmount,
-                chqIssueDate: transactionDetails.cashChqDate,
-                chqRealizeDate: transactionDetails.chqRealizeDate,
-                chqSupplierId: params.supplierId,
-                chqSupplierName: supplierData?.name ?? '',
-                timestamp: timestamp, // Add timestamp to the transaction
-            });
+            if (transactionDetails.chqNo !== 'cash') {
+                const chqRef = collection(firestore, `users/${user.uid}/Cheques`);
+                const supplierData = supplierDoc.data();
+                await addDoc(chqRef, {
+                    chqNo: transactionDetails.chqNo,
+                    chqIssuedBank: transactionDetails.chqIssuedBank,
+                    chqAmount: transactionDetails.cashChqAmount,
+                    chqIssueDate: transactionDetails.cashChqDate,
+                    chqRealizeDate: transactionDetails.chqRealizeDate,
+                    chqSupplierId: params.supplierId,
+                    chqSupplierName: supplierData?.name ?? '',
+                    timestamp: timestamp, // Add timestamp to the transaction
+                });
+            }
 
             console.log('Transaction added successfully');
     
@@ -116,12 +122,12 @@ const SupplierTransactions = ({ params }: { params: { supplierId: string } }) =>
                 chqRealizeDate: '',
                 outstandingBalance: '',
             });
-    
             // Reload the data
             getTransactions();
     
             // Reload whole window to update the total due in the supplier list
             window.location.reload();
+        }
     
             // Close the modal
             setModalOpen(false);

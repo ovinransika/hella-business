@@ -3,7 +3,6 @@ import React, { useState, useEffect } from 'react';
 import { auth, firestore } from '@/app/firebase/config';
 import { collection, setDoc, doc, addDoc, getDoc } from 'firebase/firestore';
 import { useAuthState } from 'react-firebase-hooks/auth';
-import router from 'next/router';
 
 const AddSuppliers = () => {
     const [user] = useAuthState(auth);
@@ -15,31 +14,15 @@ const AddSuppliers = () => {
     const [supplierEmail, setSupplierEmail] = useState('');
     const [supplierTotalDue, setSupplierTotalDue] = useState('');
 
-    //Supplier Payable Management
-    const [supplierPayableNumber, setSupplierPayableNumber] = useState('');
-    const [supplierPayableDate, setSupplierPayableDate] = useState('');
-    const [supplierPaymentType, setSupplierPaymentType] = useState('');
-    const [supplierPayableAmount, setSupplierPayableAmount] = useState('');
-    const [supplierTotalPaid, setSupplierTotalPaid] = useState('');
-    const [supplierPayableChequeNumber, setSupplierPayableChequeNumber] = useState('');
-
-    //Supplier Returns Management
-    const [supplierReturnNumber, setSupplierReturnNumber] = useState('');
-    const [supplierReturnsAmount, setSupplierReturnsAmount] = useState('');
-
-    //Supplier Orders Management
-    const [supplierOrderNumber, setSupplierOrderNumber] = useState('');
-    const [supplierOrdersAmount, setSupplierOrdersAmount] = useState('');
-
-    //Supplier Damage Management
-    const [supplierDamageNumber, setSupplierDamageNumber] = useState('');
-    const [supplierDamageAmount, setSupplierDamageAmount] = useState('');
-
     const handleSubmit = async (e: { preventDefault: () => void; }) => {
         e.preventDefault(); // Prevent default form submission behavior
 
         try {
-            // Add supplier information to Firestore
+            if(supplierName === '' || supplierCompanyName === '' || supplierContactNo === '' || supplierEmail === '' || supplierTotalDue === ''){
+                alert('Please fill all the fields');
+                return;
+            }else{
+                // Add supplier information to Firestore
             const docRef = await addDoc(collection(firestore, `users/${user?.uid}/Suppliers`), {
                 name: supplierName,
                 companyName: supplierCompanyName,
@@ -57,11 +40,12 @@ const AddSuppliers = () => {
                 setSupplierEmail('');
                 setSupplierTotalDue('');
                 console.log('Supplier information added to Firestore.');
-                // Redirect to suppliers page
-                router.push('/suppliers');
+                // Go to suppliers page
+                window.location.href = '/suppliers';
             } else {
                 console.error('Error: Supplier creation response is undefined.');
             }
+        }
         } catch (error) {
             console.error('Error:', error);
         }
