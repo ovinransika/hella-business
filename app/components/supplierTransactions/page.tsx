@@ -2,7 +2,9 @@
 import React, { useEffect, useState } from 'react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, firestore } from '@/app/firebase/config';
-import { collection, addDoc, getDocs, doc, getDoc, setDoc, deleteDoc, query, orderBy, Query, DocumentData } from 'firebase/firestore';
+import { collection, addDoc, getDocs, doc, getDoc, setDoc, query, orderBy, Query, DocumentData } from 'firebase/firestore';
+import jsPDF from 'jspdf';
+import 'jspdf-autotable';
 
 const SupplierTransactions = ({ params }: { params: { supplierId: string } }) => {
     const [currentPage, setCurrentPage] = useState(1);
@@ -175,6 +177,63 @@ const SupplierTransactions = ({ params }: { params: { supplierId: string } }) =>
         setCurrentPage(page);
     };
     
+    const generatePDF = () => {
+         // Get today's date
+        const today = new Date();
+        const todayFormatted = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}-${today.getDate().toString().padStart(2, '0')}`;
+
+        const doc = new jsPDF({ orientation: 'landscape' }); // Set orientation to landscape
+        doc.text(`30 Supplier Transactions Upto ${todayFormatted}`, 10, 10);
+        
+        const columns = [
+            'Transaction No.',
+            'Date',
+            'Invoice No.',
+            'Total',
+            'Return No.',
+            'Return Total',
+            'Damage Total',
+            'Balance',
+            'Cash/CHQ Date',
+            'CHQ No.',
+            'CHQ Issued Bank',
+            'Cash/CHQ Amount',
+            'CHQ Realize Date',
+            'Outstanding Balance',
+        ];
+        
+        const rows = getCurrentPageData().map(item => [
+            item.transactionNo,
+            item.date,
+            item.invoiceNo,
+            item.total,
+            item.returnNo,
+            item.returnTotal,
+            item.damageTotal,
+            item.balance,
+            item.cashChqDate,
+            item.chqNo,
+            item.chqIssuedBank,
+            item.cashChqAmount,
+            item.chqRealizeDate,
+            item.outstandingBalance,
+        ]);
+    
+        // Add autoTable plugin
+        (doc as any).autoTable({
+            head: [columns],
+            body: rows,
+            theme: 'grid',
+            styles: {
+                lineColor: [0, 0, 0],
+                lineWidth: 0.5,
+            },
+        });
+    
+        const pdfName = `30_Supplier_Transactions_Up_To_${todayFormatted}.pdf`;
+        doc.save(pdfName);
+    };    
+
 
     useEffect(() => {
         if (user) {
@@ -189,6 +248,9 @@ const SupplierTransactions = ({ params }: { params: { supplierId: string } }) =>
                 <h1 className="text-2xl font-semibold mb-5">Supplier Transactions</h1>
                 <button className="bg-black hover:bg-white hover:text-red-800 text-white font-bold py-2 px-4 rounded" onClick={() => setModalOpen(true)}>
                     Record Transaction
+                </button>
+                <button className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded ml-4" onClick={generatePDF}>
+                    Export to PDF
                 </button>
             </div>
             <table className="w-full">
