@@ -146,24 +146,37 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
     
         try {
             const transactionsRef = collection(firestore, `users/${user.uid}/Suppliers/${params.supplierId}/Transactions`);
-            
+    
             // Create a query to order transactions by timestamp in descending order
             const transactionsQuery = query(transactionsRef, orderBy('timestamp', 'asc'));
-            
+    
             const querySnapshot = await getDocs(transactionsQuery);
-
+    
             let transactions: any[] = [];
-            querySnapshot.forEach((doc) => {
-                transactions.push({ ...doc.data(), id: doc.id });
-            });
-
+    
+            // Use Promise.all to wait for all payments fetching to complete
+            await Promise.all(querySnapshot.docs.map(async (doc) => {
+                const transactionData = doc.data();
+                const transactionId = doc.id;
+    
+                // Fetch Payments for this transaction
+                const paymentsRef = collection(firestore, `users/${user.uid}/Suppliers/${params.supplierId}/Transactions/${transactionId}/Payments`);
+                const paymentsSnapshot = await getDocs(paymentsRef);
+                const payments = paymentsSnapshot.docs.map(payment => ({ ...payment.data(), id: payment.id }));
+    
+                transactions.push({ ...transactionData, id: transactionId, payments });
+            }));
+    
             setTransactionsData(transactions);
+            setPaymentsData(transactions.map(transaction => transaction.payments).flat());
         } catch (error) {
             console.error('Error fetching transactions:', error);
         }
     };
+    
+    
 
-    const getPaymentData = async (transactionId: string) => {
+    /* const getPaymentData = async (transactionId: string) => {
         if (!user) {
             console.log('User not logged in');
             return;
@@ -183,12 +196,11 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
         } catch (error) {
             console.error('Error fetching payments:', error);
         }
-    }
+    } */
 
     const handlePayClick = (id: string) => {
         setPaymentModalOpen(true);
         setTransactionId(id);
-        getPaymentData(id);
 
     }
         
@@ -275,28 +287,45 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
                 </tr>
             </thead>
             <tbody>
-                {getCurrentPageData().map((item, index) => (
-                    <tr key={index} className="border border-black">
-                        <td className="px-4 py-2 border border-black hidden sm:table-cell">{item.id}</td>
-                        <td className="px-4 py-2 border border-black hidden sm:table-cell">{item.date}</td>
-                        <td className="px-4 py-2 border border-black hidden lg:table-cell">{item.invoiceNo}</td>
-                        <td className="px-4 py-2 border border-black hidden lg:table-cell">{item.total}</td>
-                        <td className="px-4 py-2 border border-black hidden lg:table-cell">{item.returnNo}</td>
-                        <td className="px-4 py-2 border border-black hidden lg:table-cell">{item.returnTotal}</td>
-                        <td className="px-4 py-2 border border-black hidden lg:table-cell">{item.damageTotal}</td>
-                        <td className="px-4 py-2 border border-black hidden lg:table-cell">{item.balance}</td>
-                        <td className="px-4 py-2 border border-black hidden lg:table-cell">{item.paymentDate}</td>
-                        <td className="px-4 py-2 border border-black hidden lg:table-cell">{item.chqNo}</td>
-                        <td className="px-4 py-2 border border-black hidden lg:table-cell">{item.chqIssuedBank}</td>
-                        <td className="px-4 py-2 border border-black hidden lg:table-cell">{item.cashChqAmount}</td>
-                        <td className="px-4 py-2 border border-black hidden lg:table-cell">{item.chqRealizeDate}</td>
-                        <td className="px-4 py-2 border border-black hidden lg:table-cell">{item.outstandingBalance}</td>
-                        <td className="px-4 py-2 border border-black hidden lg:table-cell">
-                            <button className="bg-lime-500 hover:bg-lime-700 text-white font-bold py-2 px-4 rounded" onClick={() => handlePayClick(item.id)}>Pay</button>
-                        </td>
-                    </tr>
-                ))}
-            </tbody>
+    {getCurrentPageData().map((item, index) => {
+        console.log("Item:", item); // Log the item to see its structure
+        return (
+            <tr key={index} className="border border-black">
+                <td className="px-4 py-2 border border-black hidden sm:table-cell">{item.id}</td>
+                <td className="px-4 py-2 border border-black hidden sm:table-cell">{item.date}</td>
+                <td className="px-4 py-2 border border-black hidden lg:table-cell">{item.invoiceNo}</td>
+                <td className="px-4 py-2 border border-black hidden lg:table-cell">{item.total}</td>
+                <td className="px-4 py-2 border border-black hidden lg:table-cell">{item.returnNo}</td>
+                <td className="px-4 py-2 border border-black hidden lg:table-cell">{item.returnTotal}</td>
+                <td className="px-4 py-2 border border-black hidden lg:table-cell">{item.damageTotal}</td>
+                <td className="px-4 py-2 border border-black hidden lg:table-cell">{item.balance}</td>
+                {/* Displaying the first payment date */}
+                <td className="px-4 py-2 border border-black hidden lg:table-cell">
+                    {item.payments.length > 0 ? item.payments[0].cashPaymentDate || item.payments[0].chqPaymentDate : 'N/A'}
+                </td>
+                <td className="px-4 py-2 border border-black hidden lg:table-cell">
+                    {item.payments && item.payments.length > 0 && item.payments[0].chqNo ? item.payments[0].chqNo : "N/A"}
+                </td>
+                <td className="px-4 py-2 border border-black hidden lg:table-cell">
+                    {item.payments && item.payments.length > 0 && item.payments[0].chqIssuedBank ? item.payments[0].chqIssuedBank : "N/A"}
+                </td>
+                <td className="px-4 py-2 border border-black hidden lg:table-cell">
+                    {item.payments && item.payments.length > 0 ? item.payments[0].cashPaymentAmount || item.payments[0].chequePaymentAmount : "N/A"}
+                </td>
+                <td className="px-4 py-2 border border-black hidden lg:table-cell">
+                    {item.payments && item.payments.length > 0 && item.payments[0].chqRealizeDate ? item.payments[0].chqRealizeDate : "N/A"}
+                </td>
+                <td className="px-4 py-2 border border-black hidden lg:table-cell">
+                    {item.outstandingBalance}
+                </td>
+                <td className="px-4 py-2 border border-black hidden lg:table-cell">
+                    <button className="bg-lime-500 hover:bg-lime-700 text-white font-bold py-2 px-4 rounded" onClick={() => handlePayClick(item.id)}>Pay</button>
+                </td>
+            </tr>
+        );
+    })}
+</tbody>
+
         </table>
     </div>
     {/* Pagination */}
