@@ -5,6 +5,7 @@ import { auth, firestore } from "@/app/firebase/config";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 import SupplierReturns from "@/app/components/supplierReturns/page";
 import SupplierTransactions from "@/app/components/supplierTransactions/page";
+import SupplierTransactions2 from "@/app/components/supplierTransactions2/page";
 
 export default function SupplierDetails({ params }: { params: { supplierId: string } }) {
     const [user] = useAuthState(auth);
@@ -138,7 +139,7 @@ export default function SupplierDetails({ params }: { params: { supplierId: stri
             </div>
 
             <div>
-                <SupplierTransactions params={{ supplierId: params.supplierId }} />
+                <SupplierTransactions2 params={{ supplierId: params.supplierId }} />
             </div>
 
             {editModalOpen && (
