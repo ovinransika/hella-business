@@ -115,11 +115,11 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
             const transactionRef = doc(firestore, `users/${user?.uid}/Suppliers/${params.supplierId}/Transactions/${transactionId}`);
             const transactionDoc = await getDoc(transactionRef);
             if (transactionDoc.exists()) {
-                if (transactionDoc.data().balance <= 0) {
-                    alert('The balance of this transaction has already been cleared!')
+                if (transactionDoc.data().outstandingBalance <= 0) {
+                    alert('The outstanding balance of this transaction has already been cleared!')
                 } else {
-                    const newOutstandingBalance = Number(transactionDoc.data().balance) - Number(cashPaymentDetails.cashPaymentAmount || chequePaymentDetails.chequePaymentAmount);
-                    await setDoc(transactionRef, { balance: newOutstandingBalance }, { merge: true });
+                    const newOutstandingBalance = Number(transactionDoc.data().outstandingBalance) - Number(cashPaymentDetails.cashPaymentAmount || chequePaymentDetails.chequePaymentAmount);
+                    await setDoc(transactionRef, { outstandingBalance: newOutstandingBalance }, { merge: true });
 
                     //Get Supplier's Total Due and deduct the payment amount from it
                     const supplierRef = doc(firestore, `users/${user?.uid}/Suppliers/${params.supplierId}`);
@@ -220,7 +220,8 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
             const remainingTotalDue = Number(totalDue) + Number(balance);
                 newTransactionDetails = {
                     ...newTransactionDetails,
-                    balance: remainingTotalDue.toString(),
+                    balance: balance.toString(),
+                    outstandingBalance: remainingTotalDue.toString(),
                 };
         }
 
@@ -282,7 +283,7 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
                     <th className="px-4 py-2 border-2 border-black bg-lime-600 hidden lg:table-cell">CHQ issued Bank</th>
                     <th className="px-4 py-2 border-2 border-black bg-lime-600 hidden lg:table-cell">Cash/CHQ Amount</th>
                     <th className="px-4 py-2 border-2 border-black bg-orange-600 hidden lg:table-cell">CHQ Realize Date</th>
-                    <th className="px-4 py-2 border-2 border-black bg-red-800 hidden lg:table-cell">Outstanding Balance on Recorded Day</th>
+                    <th className="px-4 py-2 border-2 border-black bg-red-800 hidden lg:table-cell">Outstanding Balance</th>
                     <th className="px-4 py-2 border-2 border-black bg-red-800 hidden lg:table-cell">Actions</th>
                 </tr>
             </thead>
