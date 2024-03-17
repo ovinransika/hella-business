@@ -1,28 +1,70 @@
-'use client';
-import React, { useState, useEffect } from 'react';
+'use client'
+import React, { useState } from 'react';
 import { auth, firestore } from '@/app/firebase/config';
-import { collection, setDoc, doc, addDoc, getDoc } from 'firebase/firestore';
+import { collection, addDoc } from 'firebase/firestore';
 import { useAuthState } from 'react-firebase-hooks/auth';
 
 const AddSuppliers = () => {
     const [user] = useAuthState(auth);
 
-    //Supplier States
+    // Supplier States
     const [supplierName, setSupplierName] = useState('');
     const [supplierCompanyName, setSupplierCompanyName] = useState('');
     const [supplierContactNo, setSupplierContactNo] = useState('');
     const [supplierEmail, setSupplierEmail] = useState('');
     const [supplierTotalDue, setSupplierTotalDue] = useState('');
 
+    // Error States
+    const [nameError, setNameError] = useState('');
+    const [companyNameError, setCompanyNameError] = useState('');
+    const [contactNoError, setContactNoError] = useState('');
+    const [emailError, setEmailError] = useState('');
+    const [totalDueError, setTotalDueError] = useState('');
+
     const handleSubmit = async (e: { preventDefault: () => void; }) => {
         e.preventDefault(); // Prevent default form submission behavior
 
+        // Reset previous errors
+        setNameError('');
+        setCompanyNameError('');
+        setContactNoError('');
+        setEmailError('');
+        setTotalDueError('');
+
+        let hasError = false;
+
+        // Validation
+        if (supplierName.trim() === '') {
+            setNameError('*Supplier name is required');
+            hasError = true;
+        }
+
+        if (supplierCompanyName.trim() === '') {
+            setCompanyNameError('*Company name is required');
+            hasError = true;
+        }
+
+        if (supplierContactNo.trim() === '') {
+            setContactNoError('*Contact number is required');
+            hasError = true;
+        }
+
+        if (supplierEmail.trim() === '') {
+            setEmailError('*Email is required');
+            hasError = true;
+        }
+
+        if (supplierTotalDue.trim() === '') {
+            setTotalDueError("*Supplier's total due is required");
+            hasError = true;
+        }
+
+        if (hasError) {
+            return;
+        }
+
         try {
-            if(supplierName === '' || supplierCompanyName === '' || supplierContactNo === '' || supplierEmail === '' || supplierTotalDue === ''){
-                alert('Please fill all the fields');
-                return;
-            }else{
-                // Add supplier information to Firestore
+            // Add supplier information to Firestore
             const docRef = await addDoc(collection(firestore, `users/${user?.uid}/Suppliers`), {
                 name: supplierName,
                 companyName: supplierCompanyName,
@@ -45,7 +87,6 @@ const AddSuppliers = () => {
             } else {
                 console.error('Error: Supplier creation response is undefined.');
             }
-        }
         } catch (error) {
             console.error('Error:', error);
         }
@@ -54,38 +95,83 @@ const AddSuppliers = () => {
     return (
         <div>
             <h1 className='text-3xl font-bold text-center'>Add Supplier</h1>
-            <form className='mt-4'>
+            <form className='mt-4' onSubmit={handleSubmit}>
                 <div className='mb-4'>
                     <div className="label">
                         <span className="label-text">Supplier Name</span>
                     </div>
-                    <input type='text' className="input input-bordered input-primary w-full max-w-xs" id='name' name='name' value={supplierName} onChange={(e) => setSupplierName(e.target.value)} />
+                    <input
+                        type='text'
+                        className="input input-bordered input-primary w-full max-w-xs"
+                        id='name'
+                        name='name'
+                        value={supplierName}
+                        onChange={(e) => setSupplierName(e.target.value)}
+                    />
+                    {nameError && <p className="text-red-500 text-xs">{nameError}</p>}
                 </div>
                 <div className='mb-4'>
                     <div className="label">
                         <span className="label-text">Supplier Company Name</span>
                     </div>
-                    <input type='text' className="input input-bordered input-primary w-full max-w-xs" id='companyName' name='companyName' value={supplierCompanyName} onChange={(e) => setSupplierCompanyName(e.target.value)} />
+                    <input
+                        type='text'
+                        className="input input-bordered input-primary w-full max-w-xs"
+                        id='companyName'
+                        name='companyName'
+                        value={supplierCompanyName}
+                        onChange={(e) => setSupplierCompanyName(e.target.value)}
+                    />
+                    {companyNameError && <p className="text-red-500 text-xs">{companyNameError}</p>}
                 </div>
                 <div className='mb-4'>
                     <div className="label">
                         <span className="label-text">Supplier Contact No.</span>
                     </div>
-                    <input type='text' className="input input-bordered input-primary w-full max-w-xs" id='contactNo' name='contactNo' value={supplierContactNo} onChange={(e) => setSupplierContactNo(e.target.value)} />
+                    <input
+                        type='text'
+                        className="input input-bordered input-primary w-full max-w-xs"
+                        id='contactNo'
+                        name='contactNo'
+                        value={supplierContactNo}
+                        onChange={(e) => setSupplierContactNo(e.target.value)}
+                    />
+                    {contactNoError && <p className="text-red-500 text-xs">{contactNoError}</p>}
                 </div>
                 <div className='mb-4'>
                     <div className="label">
                         <span className="label-text">Supplier Email</span>
                     </div>
-                    <input type='text' className="input input-bordered input-primary w-full max-w-xs" id='email' name='email' value={supplierEmail} onChange={(e) => setSupplierEmail(e.target.value)} />
+                    <input
+                        type='text'
+                        className="input input-bordered input-primary w-full max-w-xs"
+                        id='email'
+                        name='email'
+                        value={supplierEmail}
+                        onChange={(e) => setSupplierEmail(e.target.value)}
+                    />
+                    {emailError && <p className="text-red-500 text-xs">{emailError}</p>}
                 </div>
                 <div className='mb-4'>
                     <div className="label">
                         <span className="label-text">Supplier's Current Payables</span>
                     </div>
-                    <input type='text' className="input input-bordered input-primary w-full max-w-xs" id='payables' name='payables' value={supplierTotalDue} onChange={(e) => setSupplierTotalDue(e.target.value)} />
+                    <input
+                        type='text'
+                        className="input input-bordered input-primary w-full max-w-xs"
+                        id='payables'
+                        name='payables'
+                        value={supplierTotalDue}
+                        onChange={(e) => setSupplierTotalDue(e.target.value)}
+                    />
+                    {totalDueError && <p className="text-red-500 text-xs">{totalDueError}</p>}
                 </div>
-                <button onClick={handleSubmit} className='bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mt-5' type='submit'>Add Supplier</button>
+                <button
+                    className='bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mt-5'
+                    type='submit'
+                >
+                    Add Supplier
+                </button>
             </form>
         </div>
     );
