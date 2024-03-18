@@ -103,30 +103,33 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
         }
 
         try{
-            const timestamp = new Date();
-            const paymentRef = collection(firestore, `users/${user.uid}/Suppliers/${params.supplierId}/Transactions/${transactionId}/Payments`);
-            if(paymentModeCash === true){
-                await addDoc(paymentRef, {
-                    ...cashPaymentDetails,
-                    timestamp: timestamp,
-                });
-            } else {
-                await addDoc(paymentRef, {
-                    ...chequePaymentDetails,
-                    timestamp: timestamp,
-                });
-            }
-
             const transactionRef = doc(firestore, `users/${user?.uid}/Suppliers/${params.supplierId}/Transactions/${transactionId}`);
             const transactionDoc = await getDoc(transactionRef);
             if (transactionDoc.exists()) {
-                if (transactionDoc.data().outstandingBalance <= 0) {
+                let paymentAmount = Number(cashPaymentDetails.cashPaymentAmount || chequePaymentDetails.chequePaymentAmount);
+                let outstandingBalanceAmount = Number(transactionDoc.data().outstandingBalance);
+                if (outstandingBalanceAmount <= 0) {
                     setOutstandingBalanceZeroAlert(true);
                     setPaymentModalOpen(false);
-                } else if(cashPaymentDetails.cashPaymentAmount > transactionDoc.data().outstandingBalance || chequePaymentDetails.chequePaymentAmount > transactionDoc.data().outstandingBalance){
+                } else if(outstandingBalanceAmount < paymentAmount){
+                    console.log('Outstanding Balance:', outstandingBalanceAmount);
+                    console.log('Cash Payment Amount:', paymentAmount);
                     setOutstandingBalanceExceedsAlert(true);
                     setPaymentModalOpen(false);     
                 } else {
+                    const timestamp = new Date();
+                    const paymentRef = collection(firestore, `users/${user.uid}/Suppliers/${params.supplierId}/Transactions/${transactionId}/Payments`);
+                    if(paymentModeCash === true){
+                        await addDoc(paymentRef, {
+                            ...cashPaymentDetails,
+                            timestamp: timestamp,
+                        });
+                    } else {
+                        await addDoc(paymentRef, {
+                            ...chequePaymentDetails,
+                            timestamp: timestamp,
+                        });
+                    }
                     const newOutstandingBalance = Number(transactionDoc.data().outstandingBalance) - Number(cashPaymentDetails.cashPaymentAmount || chequePaymentDetails.chequePaymentAmount);
                     await setDoc(transactionRef, { outstandingBalance: newOutstandingBalance }, { merge: true });
 
@@ -289,16 +292,19 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
         </div>
         ) : null}
         <div style={{ borderRadius: '10px' }} className="mt-10 p-10 bg-neutral-700">
-            <div className="flex justify-between mb-5">
-                <h1 className="text-2xl font-semibold mb-5">Supplier Transactions 2</h1>
-                <button className="bg-black hover:bg-white hover:text-red-800 text-white font-bold py-2 px-4 rounded" onClick={() => setModalOpen(true)}>
+            <div className="flex mb-5">
+                <h1 className="text-2xl font-semibold mb-5">Supplier Transactions</h1>
+                <button className="bg-black hover:bg-white hover:text-red-800 text-white font-bold py-2 px-4 rounded ml-auto" onClick={() => setModalOpen(true)}>
                     Record Transaction
                 </button>
-                <button className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded ml-4">
+                {transactionsData.length != 0 ? (
+                    <button className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded ml-4">
                     Export to PDF
                 </button>
+                ) : null}
             </div>
-            <div className="overflow-x-auto">
+            {transactionsData.length != 0 ? (
+                <div className="overflow-x-auto">
                 <table className="w-full">
                     <thead>
                         <tr>
@@ -319,47 +325,50 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
                         </tr>
                     </thead>
                     <tbody>
-            {getCurrentPageData().map((item, index) => {
-                return (
-                    <tr key={index} className="border border-black">
-                        <td className="px-4 py-2 border border-black hidden sm:table-cell">{item.date}</td>
-                        <td className="px-4 py-2 border border-black hidden lg:table-cell">{item.invoiceNo}</td>
-                        <td className="px-4 py-2 border border-black hidden lg:table-cell">{item.total}</td>
-                        <td className="px-4 py-2 border border-black hidden lg:table-cell">{item.returnNo}</td>
-                        <td className="px-4 py-2 border border-black hidden lg:table-cell">{item.returnTotal}</td>
-                        <td className="px-4 py-2 border border-black hidden lg:table-cell">{item.damageTotal}</td>
-                        <td className="px-4 py-2 border border-black hidden lg:table-cell">{item.balance}</td>
-                        <td className="px-4 py-2 border border-black hidden lg:table-cell">
-                            {item.payments.length > 0 ? item.payments[0].cashPaymentDate || item.payments[0].chqPaymentDate : 'N/A'}
-                        </td>
-                        <td className="px-4 py-2 border border-black hidden lg:table-cell">
-                            {item.payments && item.payments.length > 0 && item.payments[0].chqNo ? item.payments[0].chqNo : "N/A"}
-                        </td>
-                        <td className="px-4 py-2 border border-black hidden lg:table-cell">
-                            {item.payments && item.payments.length > 0 && item.payments[0].chqIssuedBank ? item.payments[0].chqIssuedBank : "N/A"}
-                        </td>
-                        <td className="px-4 py-2 border border-black hidden lg:table-cell">
-                            {item.payments && item.payments.length > 0 ? item.payments[0].cashPaymentAmount || item.payments[0].chequePaymentAmount : "N/A"}
-                        </td>
-                        <td className="px-4 py-2 border border-black hidden lg:table-cell">
-                            {item.payments && item.payments.length > 0 && item.payments[0].chqRealizeDate ? item.payments[0].chqRealizeDate : "N/A"}
-                        </td>
-                        <td className="px-4 py-2 border border-black hidden lg:table-cell">
-                            {item.outstandingBalance}
-                        </td>
-                        <td className="px-4 py-2 border border-black hidden lg:table-cell">
-                            <div className='flex gap-3'>
-                                <button className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" onClick={() => getPaymentData(item.id)}>View</button>
-                                <button className="bg-lime-500 hover:bg-lime-700 text-white font-bold py-2 px-4 rounded" onClick={() => handlePayClick(item.id)}>Pay</button>
-                            </div>
-                        </td>
-                    </tr>
-                );
-            })}
-        </tbody>
+                    {getCurrentPageData().map((item, index) => {
+                        return (
+                            <tr key={index} className="border border-black">
+                                <td className="px-4 py-2 border border-black hidden sm:table-cell">{item.date}</td>
+                                <td className="px-4 py-2 border border-black hidden lg:table-cell">{item.invoiceNo}</td>
+                                <td className="px-4 py-2 border border-black hidden lg:table-cell">{item.total}</td>
+                                <td className="px-4 py-2 border border-black hidden lg:table-cell">{item.returnNo}</td>
+                                <td className="px-4 py-2 border border-black hidden lg:table-cell">{item.returnTotal}</td>
+                                <td className="px-4 py-2 border border-black hidden lg:table-cell">{item.damageTotal}</td>
+                                <td className="px-4 py-2 border border-black hidden lg:table-cell">{item.balance}</td>
+                                <td className="px-4 py-2 border border-black hidden lg:table-cell">
+                                    {item.payments.length > 0 ? item.payments[0].cashPaymentDate || item.payments[0].chqPaymentDate : 'N/A'}
+                                </td>
+                                <td className="px-4 py-2 border border-black hidden lg:table-cell">
+                                    {item.payments && item.payments.length > 0 && item.payments[0].chqNo ? item.payments[0].chqNo : "N/A"}
+                                </td>
+                                <td className="px-4 py-2 border border-black hidden lg:table-cell">
+                                    {item.payments && item.payments.length > 0 && item.payments[0].chqIssuedBank ? item.payments[0].chqIssuedBank : "N/A"}
+                                </td>
+                                <td className="px-4 py-2 border border-black hidden lg:table-cell">
+                                    {item.payments && item.payments.length > 0 ? item.payments[0].cashPaymentAmount || item.payments[0].chequePaymentAmount : "N/A"}
+                                </td>
+                                <td className="px-4 py-2 border border-black hidden lg:table-cell">
+                                    {item.payments && item.payments.length > 0 && item.payments[0].chqRealizeDate ? item.payments[0].chqRealizeDate : "N/A"}
+                                </td>
+                                <td className="px-4 py-2 border border-black hidden lg:table-cell">
+                                    {item.outstandingBalance}
+                                </td>
+                                <td className="px-4 py-2 border border-black hidden lg:table-cell">
+                                    <div className='flex gap-3'>
+                                        <button className="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" onClick={() => getPaymentData(item.id)}>View</button>
+                                        <button className="bg-lime-500 hover:bg-lime-700 text-white font-bold py-2 px-4 rounded" onClick={() => handlePayClick(item.id)}>Pay</button>
+                                    </div>
+                                </td>
+                            </tr>
+                        );
+                    })}
+                    </tbody>
 
                 </table>
             </div>
+            ):(
+                <p className="text-center font-semibold text-white">No transactions recorded yet!</p>
+            )}
             {/* Pagination */}
             <div className="mt-5">
                 {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
@@ -533,15 +542,15 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
                             aria-labelledby="modal-headline"
                         >
                             <div className="bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                                <div className="sm:flex sm:items-start">
-                                    <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
-                                    <div className="flex items-center justify-between p-2">
+                                <div>
+                                    <div className="mt-3 text-center sm:text-left">
+                                    <div className="flex p-2">
                                         <h2 className="text-xl font-semibold mb-4">RECORD PAYMENT</h2>
-                                        <button className="btn btn-square bg-red-500 text-white" onClick={() => setPaymentModalOpen(false)}>X</button>
+                                        <button className="btn btn-square bg-red-500 text-white ml-auto" onClick={() => setPaymentModalOpen(false)}>X</button>
                                     </div>
                                         <div className="mt-2">
                                             <div className="flex flex-col sm:flex-row">
-                                            <div className="w-full sm:w-1/2 sm:pr-2 mb-4">
+                                            <div className="w-full sm:pr-2 mb-4">
                                                 <label htmlFor="paymentDate" className="block text-sm font-medium text-white">
                                                     Cash/CHQ
                                                 </label>
@@ -559,7 +568,7 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
                                             </div>
                                             {paymentModeCash ? (
                                                 <>
-                                                <div className="w-full sm:w-1/2 sm:pr-2 mb-4">
+                                                <div className="w-full sm:pr-2 mb-4">
                                             <label htmlFor="cashPaymentDate" className="block text-sm font-medium text-white">
                                                         Payment Date
                                                     </label>
@@ -573,7 +582,7 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
                                                     />
                                             </div>
                                             <div className="flex flex-col sm:flex-row">
-                                                <div className="w-full sm:w-1/2 sm:pr-2 mb-4">
+                                                <div className="w-full sm:pr-2 mb-4">
                                                 <label htmlFor="cashPaymentAmount" className="block text-sm font-medium text-white">
                                                         Cash Amount
                                                     </label>
@@ -585,19 +594,6 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
                                                         value={cashPaymentDetails.cashPaymentAmount}
                                                         className="mt-1 p-2 w-full border border-blue-500 rounded-md"
                                                     />
-                                                </div>
-                                                <div className="w-full sm:w-1/2 sm:pl-2 mb-4">
-                                                    <label htmlFor="cashChqAmount" className="block text-sm font-medium text-white">
-                                                        Outstanding Balance
-                                                    </label>
-                                                    <input
-                                                        type="number"
-                                                        name="cashAmount"
-                                                        id="cashAmount"
-                                                        value={transactionDetails.outstandingBalance}
-                                                        className="mt-1 p-2 w-full border border-blue-500 rounded-md"
-                                                    />
-                                                    
                                                 </div>
                                             </div>
                                                 </>
@@ -671,11 +667,6 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
                                                                 value={chequePaymentDetails.chqRealizeDate}
                                                                 className="mt-1 p-2 w-full border border-blue-500 rounded-md"
                                                             />
-                                                        </div>
-                                                    </div>
-                                                    <div className="flex flex-col sm:flex-row">
-                                                        <div className='w-full sm:w-1/2 sm:pr-2 mb-4'>
-                                                            <p className="text-lg font-semibold mb-4">Outstanding Balance: {transactionDetails.outstandingBalance}</p>
                                                         </div>
                                                     </div>
                                                 </>
