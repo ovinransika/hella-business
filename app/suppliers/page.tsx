@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, firestore } from '@/app/firebase/config';
-import { getDocs, collection, deleteDoc, doc, query, where, getDocs as getSubCollectionDocs } from 'firebase/firestore';
+import { getDocs, collection, deleteDoc, doc } from 'firebase/firestore';
 import Link from 'next/link';
 
 const Suppliers = () => {
@@ -44,21 +44,34 @@ const Suppliers = () => {
         if (!user || !supplierIdToDelete) return;
 
         try {
-            // Delete transactions for the supplier
-            const transactionsQuery = query(collection(firestore, `users/${user.uid}/Suppliers/${supplierIdToDelete}/Transactions`));
-            const transactionSnapshot = await getDocs(transactionsQuery);
-            const deleteTransactionPromises = transactionSnapshot.docs.map(async (doc) => {
-                await deleteDoc(doc.ref);
-            });
-            await Promise.all(deleteTransactionPromises);
-
             // Delete supplier from Firestore
-            const supplierDoc = doc(firestore, `users/${user.uid}/Suppliers/${supplierIdToDelete}`);
-            await deleteDoc(supplierDoc);
+            const supplierDocRef = doc(firestore, `users/${user.uid}/Suppliers/${supplierIdToDelete}`);
+            
+            // Get all transactions under this supplier
+            const transactionsCollection = collection(supplierDocRef, 'Transactions');
+            const transactionsQuerySnapshot = await getDocs(transactionsCollection);
+            
+            // Delete each transaction
+            transactionsQuerySnapshot.forEach(async (transactionDoc) => {
+                await deleteDoc(transactionDoc.ref);
+                
+                // Get all payments under this transaction
+                const paymentsCollection = collection(transactionDoc.ref, 'Payments');
+                const paymentsQuerySnapshot = await getDocs(paymentsCollection);
+                
+                // Delete each payment
+                paymentsQuerySnapshot.forEach(async (paymentDoc) => {
+                    await deleteDoc(paymentDoc.ref);
+                });
+            });
 
+            // Finally, delete the supplier document
+            await deleteDoc(supplierDocRef);
+
+            // Fetch updated suppliers
             getSuppliers();
         } catch (error) {
-            console.error('Error deleting supplier and transactions: ', error);
+            console.error('Error deleting supplier and related data: ', error);
         }
 
         // Reset modal state
@@ -141,14 +154,14 @@ const Suppliers = () => {
                             <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
                                 <h3 className="text-lg leading-6 font-medium text-gray-900">Delete Confirmation</h3>
                                 <div className="mt-2">
-                                    <p className="text-sm text-gray-500">Are you sure you want to delete? This action will delete all transactions as well and cannot be undone!</p>
+                                    <p className="text-sm text-gray-500">Are you sure you want to delete? This action cannot be undone!</p>
                                 </div>
                             </div>
                         </div>
                     </div>
                     <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse flex">
-                        <button onClick={confirmDeleteSupplier} type="button" className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm">
-                            Delete Supplier
+                        <button onClick={confirmDeleteSupplier} type="button" className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red 700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm">
+                            Delete Supplier?
                         </button>
                         <button onClick={cancelDelete} type="button" className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
                             Cancel
@@ -165,4 +178,3 @@ const Suppliers = () => {
 };
 
 export default Suppliers;
-
