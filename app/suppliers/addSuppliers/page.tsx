@@ -54,11 +54,6 @@ const AddSuppliers = () => {
             hasError = true;
         }
 
-        if (supplierTotalDue.trim() === '') {
-            setTotalDueError("*Supplier's total due is required");
-            hasError = true;
-        }
-
         if (hasError) {
             return;
         }
@@ -70,7 +65,7 @@ const AddSuppliers = () => {
                 companyName: supplierCompanyName,
                 contactNo: supplierContactNo,
                 email: supplierEmail,
-                totalDue: supplierTotalDue
+                totalDue: '0'
             });
 
             if (docRef) {
@@ -151,20 +146,6 @@ const AddSuppliers = () => {
                         onChange={(e) => setSupplierEmail(e.target.value)}
                     />
                     {emailError && <p className="text-red-500 text-xs">{emailError}</p>}
-                </div>
-                <div className='mb-4'>
-                    <div className="label">
-                        <span className="label-text">Supplier's Current Payables</span>
-                    </div>
-                    <input
-                        type='text'
-                        className="input input-bordered input-primary w-full max-w-xs"
-                        id='payables'
-                        name='payables'
-                        value={supplierTotalDue}
-                        onChange={(e) => setSupplierTotalDue(e.target.value)}
-                    />
-                    {totalDueError && <p className="text-red-500 text-xs">{totalDueError}</p>}
                 </div>
                 <button
                     className='bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded mt-5'

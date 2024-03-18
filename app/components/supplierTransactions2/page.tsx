@@ -120,15 +120,39 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
                     const timestamp = new Date();
                     const paymentRef = collection(firestore, `users/${user.uid}/Suppliers/${params.supplierId}/Transactions/${transactionId}/Payments`);
                     if(paymentModeCash === true){
-                        await addDoc(paymentRef, {
-                            ...cashPaymentDetails,
-                            timestamp: timestamp,
-                        });
+                        if(cashPaymentDetails.cashPaymentAmount === '' || cashPaymentDetails.cashPaymentDate === ''){
+                            alert('Please fill all required fields');
+                            return;
+                        }else{
+                            await addDoc(paymentRef, {
+                                ...cashPaymentDetails,
+                                timestamp: timestamp,
+                            });
+                        }
+                    } else {
+                        if(chequePaymentDetails.chqPaymentDate === '' || chequePaymentDetails.chqNo === '' || chequePaymentDetails.chqIssuedBank === '' || chequePaymentDetails.chequePaymentAmount === ''){
+                            alert('Please fill all required fields');
+                            return;
                     } else {
                         await addDoc(paymentRef, {
                             ...chequePaymentDetails,
                             timestamp: timestamp,
                         });
+                        const supplierRef = doc(firestore, `users/${user?.uid}/Suppliers/${params.supplierId}`);
+                        const supplierDoc = await getDoc(supplierRef);
+                        const chqRef = collection(firestore, `users/${user.uid}/Cheques`);
+                        const supplierData = supplierDoc.data();
+                        await addDoc(chqRef, {
+                            chqNo: chequePaymentDetails.chqNo,
+                            chqIssuedBank: chequePaymentDetails.chqIssuedBank,
+                            chqAmount: chequePaymentDetails.chequePaymentAmount,
+                            chqIssueDate: chequePaymentDetails.chqPaymentDate,
+                            chqRealizeDate: chequePaymentDetails.chqRealizeDate,
+                            chqSupplierId: params.supplierId,
+                            chqSupplierName: supplierData?.name ?? '',
+                            timestamp: timestamp, // Add timestamp to the transaction
+                        });
+                    }
                     }
                     const newOutstandingBalance = Number(transactionDoc.data().outstandingBalance) - Number(cashPaymentDetails.cashPaymentAmount || chequePaymentDetails.chequePaymentAmount);
                     await setDoc(transactionRef, { outstandingBalance: newOutstandingBalance }, { merge: true });
@@ -330,11 +354,11 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
                             <tr key={index} className="border border-black">
                                 <td className="px-4 py-2 border border-black hidden sm:table-cell">{item.date}</td>
                                 <td className="px-4 py-2 border border-black hidden lg:table-cell">{item.invoiceNo}</td>
-                                <td className="px-4 py-2 border border-black hidden lg:table-cell">{item.total}</td>
+                                <td className="px-4 py-2 border border-black hidden lg:table-cell">Rs.{item.total}</td>
                                 <td className="px-4 py-2 border border-black hidden lg:table-cell">{item.returnNo}</td>
-                                <td className="px-4 py-2 border border-black hidden lg:table-cell">{item.returnTotal}</td>
-                                <td className="px-4 py-2 border border-black hidden lg:table-cell">{item.damageTotal}</td>
-                                <td className="px-4 py-2 border border-black hidden lg:table-cell">{item.balance}</td>
+                                <td className="px-4 py-2 border border-black hidden lg:table-cell">Rs.{item.returnTotal}</td>
+                                <td className="px-4 py-2 border border-black hidden lg:table-cell">Rs.{item.damageTotal}</td>
+                                <td className="px-4 py-2 border border-black hidden lg:table-cell">Rs.{item.balance}</td>
                                 <td className="px-4 py-2 border border-black hidden lg:table-cell">
                                     {item.payments.length > 0 ? item.payments[0].cashPaymentDate || item.payments[0].chqPaymentDate : 'N/A'}
                                 </td>
@@ -345,13 +369,13 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
                                     {item.payments && item.payments.length > 0 && item.payments[0].chqIssuedBank ? item.payments[0].chqIssuedBank : "N/A"}
                                 </td>
                                 <td className="px-4 py-2 border border-black hidden lg:table-cell">
-                                    {item.payments && item.payments.length > 0 ? item.payments[0].cashPaymentAmount || item.payments[0].chequePaymentAmount : "N/A"}
+                                    Rs.{item.payments && item.payments.length > 0 ? item.payments[0].cashPaymentAmount || item.payments[0].chequePaymentAmount : "N/A"}
                                 </td>
                                 <td className="px-4 py-2 border border-black hidden lg:table-cell">
                                     {item.payments && item.payments.length > 0 && item.payments[0].chqRealizeDate ? item.payments[0].chqRealizeDate : "N/A"}
                                 </td>
                                 <td className="px-4 py-2 border border-black hidden lg:table-cell">
-                                    {item.outstandingBalance}
+                                Rs.{item.outstandingBalance}
                                 </td>
                                 <td className="px-4 py-2 border border-black hidden lg:table-cell">
                                     <div className='flex gap-3'>
@@ -768,7 +792,7 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
                                     {paymentsData.filter(item => item.paymentMethod === "cash").map((item, index) => (
                                     <tr key={index} className="border border-black">
                                         <td className="px-4 py-2 border border-black">{item.cashPaymentDate}</td>
-                                        <td className="px-4 py-2 border border-black">{item.cashPaymentAmount}</td>
+                                        <td className="px-4 py-2 border border-black">Rs.{item.cashPaymentAmount}</td>
                                     </tr>
                                     ))}
                                 </tbody>
@@ -788,7 +812,7 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
                                 {paymentsData.filter(item => item.paymentMethod === "cheque").map((item, index) => (
                                 <tr key={index} className="border border-black">
                                     <td className="px-4 py-2 border border-black">{item.chqPaymentDate}</td>
-                                    <td className="px-4 py-2 border border-black">{item.chequePaymentAmount}</td>
+                                    <td className="px-4 py-2 border border-black">Rs.{item.chequePaymentAmount}</td>
                                     <td className="px-4 py-2 border border-black">{item.chqNo}</td>
                                     <td className="px-4 py-2 border border-black">{item.chqIssuedBank}</td>
                                     <td className="px-4 py-2 border border-black">{item.chqRealizeDate}</td>
