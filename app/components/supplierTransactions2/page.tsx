@@ -9,6 +9,7 @@ import 'jspdf-autotable';
 const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) => {
     const [currentPage, setCurrentPage] = useState(1);
     const [user] = useAuthState(auth);
+    const [supplierName, setSupplierName] = useState('');
     const [transactionsData, setTransactionsData] = useState<any[]>([]);
     const [paymentsData, setPaymentsData] = useState<any[]>([]);
     const [totalDue, setTotalDue] = useState(0);
@@ -46,13 +47,24 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
         chequePaymentAmount: ''
     });
 
+    const [searchDateOne, setSearchDateOne] = useState('');
+    const [searchDateTwo, setSearchDateTwo] = useState('');
+
+    const transactionsFilteredByDate = transactionsData.filter((transaction) => {
+        if (searchDateOne === '' || searchDateTwo === '') {
+            return transaction;
+        } else if (transaction.date != '' && transaction.date != '') {
+            return transaction.date >= searchDateOne && transaction.date <= searchDateTwo;
+        } 
+    });
+
     const itemsPerPage = 10;
     const totalPages = Math.ceil(transactionsData.length / itemsPerPage);
 
     const getCurrentPageData = () => {
         const startIndex = (currentPage - 1) * itemsPerPage;
         const endIndex = startIndex + itemsPerPage;
-        return transactionsData.slice(startIndex, endIndex);
+        return transactionsFilteredByDate.slice(startIndex, endIndex);
     };
 
     const handlePageChange = (page: React.SetStateAction<number>) => {
@@ -183,7 +195,7 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
             const transactionsRef = collection(firestore, `users/${user.uid}/Suppliers/${params.supplierId}/Transactions`);
     
             // Create a query to order transactions by timestamp in descending order
-            const transactionsQuery = query(transactionsRef, orderBy('timestamp', 'asc'));
+            const transactionsQuery = query(transactionsRef, orderBy('timestamp', 'desc'));
     
             const querySnapshot = await getDocs(transactionsQuery);
     
@@ -283,11 +295,174 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
             setChequePaymentDetails(newChequePaymentDetails);
         }
     };
+
+    function getSupplierName() {
+        if (!user) {
+            console.log('User not logged in');
+            return;
+        }
+        //Get name of the supplier
+        const supplierRef = doc(firestore, `users/${user.uid}/Suppliers/${params.supplierId}`);
+        getDoc(supplierRef).then((doc) => {
+            if (doc.exists()) {
+                const name = doc.data()?.name;
+                setSupplierName(name);
+            } else {
+                // doc.data() will be undefined in this case
+                console.log('No such document!');
+            }
+        }).catch((error) => {
+            console.log('Error getting document:', error);
+        });
+    }
+
+    const generatePDF = () => {
+        
+        // Get today's date
+        const today = new Date();
+        const currentMonth = today.getMonth() + 1; // January is 0, so we add 1 for human-readable month
+
+        //Get Current month name
+        const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+        const currentMonthName = monthNames[currentMonth - 1];
+
+        // Filter transactions for the current month
+        const filteredTransactions = transactionsData.filter(item => {
+            const transactionMonth = (new Date(item.date)).getMonth() + 1;
+            return transactionMonth === currentMonth;
+        });
+    
+        // If there are no transactions for the current month, return
+        if (filteredTransactions.length === 0) {
+            console.log('No transactions found for the current month.');
+            return;
+        }
+    
+        // Create a new PDF document
+        const doc = new jsPDF({ orientation: 'landscape' });
+    
+        // Set title
+        doc.text(`Transactions of ${supplierName} in ${currentMonthName} ${today.getFullYear()}`, 10, 10);
+    
+        // Define columns for the table
+        const columns = [
+            'Date',
+            'Invoice No.',
+            'Total',
+            'Return No.',
+            'Return Total',
+            'Damage Total',
+            'Balance',
+            'Cash/CHQ Date',
+            'CHQ No.',
+            'CHQ Issued Bank',
+            'Cash/CHQ Amount',
+            'CHQ Realize Date',
+            'Outstanding Balance',
+        ];
+    
+        // Initialize rows array
+        let rows: any[][] = [];
+    
+        // Map the filtered transactions to rows
+        filteredTransactions.forEach(transaction => {
+            // Transaction row
+            const transactionRow = [
+                formatDate(transaction.date),
+                transaction.invoiceNo,
+                'Rs.'+transaction.total,
+                transaction.returnNo,
+                transaction.returnTotal,
+                transaction.damageTotal,
+                'Rs.'+transaction.balance,
+                '', // Empty cell for Payment Date
+                '', // Empty cell for CHQ No.
+                '', // Empty cell for CHQ Issued Bank
+                '', // Empty cell for CHQ Amount
+                '', // Empty cell for CHQ Realize Date
+                transaction.outstandingBalance,
+            ];
+            transactionRow[7] = transaction.payments[0].cashPaymentDate || transaction.payments[0].chqPaymentDate;
+            transactionRow[8] = transaction.payments[0].chqNo || 'N/A';
+            transactionRow[9] = transaction.payments[0].chqIssuedBank || 'N/A';
+            transactionRow[10] = transaction.payments[0].cashPaymentAmount || transaction.payments[0].chequePaymentAmount;
+            transactionRow[11] = transaction.payments[0].chqRealizeDate || 'N/A';
+            rows.push(transactionRow);
+
+            //Payment rows - start the payments from index 1
+            for (let i = 1; i < transaction.payments.length; i++) {
+                const payment = transaction.payments[i];
+                const paymentRow = [
+                    '', // Empty cell for Date
+                    '', // Empty cell for Invoice No.
+                    '', // Empty cell for Total
+                    '', // Empty cell for Return No.
+                    '', // Empty cell for Return Total
+                    '', // Empty cell for Damage Total
+                    '', // Empty cell for Balance
+                    payment.cashPaymentDate || payment.chqPaymentDate,
+                    payment.chqNo || 'N/A', // Empty cell for CHQ No.
+                    payment.chqIssuedBank || 'N/A', // Empty cell for CHQ Issued Bank
+                    payment.cashPaymentAmount || payment.chequePaymentAmount, // Empty cell for CHQ Amount
+                    payment.chqRealizeDate || 'N/A', // Empty cell for CHQ Realize Date
+                    '', // Empty cell for Outstanding Balance
+                ];
+                rows.push(paymentRow);
+            }
+            // Add a red-colored row after each transaction
+            const redRow = [
+                { content: '', styles: { fillColor: [255, 99, 71] } },
+                { content: '', styles: { fillColor: [255, 99, 71] } },
+                { content: '', styles: { fillColor: [255, 99, 71] } },
+                { content: '', styles: { fillColor: [255, 99, 71] } },
+                { content: '', styles: { fillColor: [255, 99, 71] } },
+                { content: '', styles: { fillColor: [255, 99, 71] } },
+                { content: '', styles: { fillColor: [255, 99, 71] } },
+                { content: '', styles: { fillColor: [255, 99, 71] } },
+                { content: '', styles: { fillColor: [255, 99, 71] } },
+                { content: '', styles: { fillColor: [255, 99, 71] } },
+                { content: '', styles: { fillColor: [255, 99, 71] } },
+                { content: '', styles: { fillColor: [255, 99, 71] } },
+                { content: '', styles: { fillColor: [255, 99, 71] } },
+            ];
+            rows.push(redRow);
+        });
+    
+        // Add the table to the PDF
+        (doc as any).autoTable({
+            head: [columns],
+            body: rows,
+            theme: 'grid',
+            styles: {
+                lineColor: [0, 0, 0],
+                lineWidth: 0.5,
+            },
+        });
+    
+        // Save the PDF with a name
+        const pdfName = `${supplierName} ${currentMonthName} ${today.getFullYear()} Transactions.pdf`;
+        doc.save(pdfName);
+    };
+    
+    // Helper function to format date if needed
+    function formatDate(date: string | number | Date) {
+        const d = new Date(date);
+        const year = d.getFullYear();
+        let month = '' + (d.getMonth() + 1);
+        let day = '' + d.getDate();
+    
+        if (month.length < 2) month = '0' + month;
+        if (day.length < 2) day = '0' + day;
+    
+        return [year, month, day].join('-');
+    }
+    
     
     
     useEffect(() => {
         if (user) {
             getTransactions();
+            getSupplierName();
         }
     }, [user]);
 
@@ -322,10 +497,40 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
                     Record Transaction
                 </button>
                 {transactionsData.length != 0 ? (
-                    <button className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded ml-4">
+                    <button className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded ml-4" onClick={generatePDF}>
                     Export to PDF
                 </button>
                 ) : null}
+            </div>
+            <div>
+                <div className="flex gap-4 mb-5">
+                    <div className="flex flex-col">
+                        <label htmlFor="searchDateOne" className="block text-sm font-medium text-white">
+                            Filter from date
+                        </label>
+                        <input
+                            type="date"
+                            name="searchDateOne"
+                            id="searchDateOne"
+                            onChange={(e) => setSearchDateOne(e.target.value)}
+                            value={searchDateOne}
+                            className="mt-1 p-2 w-full border border-blue-500 rounded-md"
+                        />
+                    </div>
+                    <div className="flex flex-col">
+                        <label htmlFor="searchDateTwo" className="block text-sm font-medium text-white">
+                            Filter to date
+                        </label>
+                        <input
+                            type="date"
+                            name="searchDateTwo"
+                            id="searchDateTwo"
+                            onChange={(e) => setSearchDateTwo(e.target.value)}
+                            value={searchDateTwo}
+                            className="mt-1 p-2 w-full border border-blue-500 rounded-md"
+                        />
+                    </div>
+                </div>
             </div>
             {transactionsData.length != 0 ? (
                 <div className="overflow-x-auto">

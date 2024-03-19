@@ -180,10 +180,10 @@ const SupplierTransactions = ({ params }: { params: { supplierId: string } }) =>
     const generatePDF = () => {
          // Get today's date
         const today = new Date();
-        const todayFormatted = `${today.getFullYear()}-${(today.getMonth() + 1).toString().padStart(2, '0')}-${today.getDate().toString().padStart(2, '0')}`;
+        const todayFormatted = `${today.getMonth()}`;
 
         const doc = new jsPDF({ orientation: 'landscape' }); // Set orientation to landscape
-        doc.text(`30 Supplier Transactions Upto ${todayFormatted}`, 10, 10);
+        doc.text(`Supplier Transactions of ${todayFormatted}`, 10, 10);
         
         const columns = [
             'Transaction No.',
@@ -201,8 +201,8 @@ const SupplierTransactions = ({ params }: { params: { supplierId: string } }) =>
             'CHQ Realize Date',
             'Outstanding Balance',
         ];
-        
-        const rows = getCurrentPageData().map(item => [
+        //Filter transactions of this month
+        const rows = transactionsData.filter(item => item.date.getMonth() === `${todayFormatted}`).map((item, index) => [
             item.transactionNo,
             item.date,
             item.invoiceNo,
@@ -230,7 +230,7 @@ const SupplierTransactions = ({ params }: { params: { supplierId: string } }) =>
             },
         });
     
-        const pdfName = `30_Supplier_Transactions_Up_To_${todayFormatted}.pdf`;
+        const pdfName = `Supplier_Transactions_Of_${todayFormatted}.pdf`;
         doc.save(pdfName);
     };    
 
