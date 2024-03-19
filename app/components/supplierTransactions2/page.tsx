@@ -2,23 +2,29 @@
 import React, { useEffect, useState } from 'react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, firestore } from '@/app/firebase/config';
-import { collection, addDoc, getDocs, doc, getDoc, setDoc, query, orderBy, Query, DocumentData } from 'firebase/firestore';
+import { collection, addDoc, getDocs, doc, getDoc, setDoc, query, orderBy, Query, DocumentData, deleteDoc } from 'firebase/firestore';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
+import { set } from 'firebase/database';
 
 const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) => {
     const [currentPage, setCurrentPage] = useState(1);
     const [user] = useAuthState(auth);
     const [supplierName, setSupplierName] = useState('');
+    const [transactionId, setTransactionId] = useState('');
+    const [monthToExportPdf, setMonthToExportPdf] = useState('');
+    const [error, setError] = useState('');
+
     const [transactionsData, setTransactionsData] = useState<any[]>([]);
     const [paymentsData, setPaymentsData] = useState<any[]>([]);
     const [totalDue, setTotalDue] = useState(0);
+
     const [modalOpen, setModalOpen] = useState(false);
     const [paymentModalOpen, setPaymentModalOpen] = useState(false);
     const [viewPaymentsModal, setViewPaymentsModal] = useState(false);
     const [viewCashPayments, setViewCashPayments] = useState(false);
+    const [viewExportPdfModal, setViewExportPdfModal] = useState(false);
     const [paymentModeCash, setPaymentModeCash] = useState(false);
-    const [transactionId, setTransactionId] = useState('');
     const [outstandingBalanceZeroAlert, setOutstandingBalanceZeroAlert] = useState(false);
     const [outstandingBalanceExceedsAlert, setOutstandingBalanceExceedsAlert] = useState(false);
     const [transactionDetails, setTransactionDetails] = useState({
@@ -316,28 +322,82 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
         });
     }
 
-    const generatePDF = () => {
+    const generatePDF = (month: string) => {
+
+        if(!month){
+            setError('Please select a month to export the PDF');
+            return;
+        }
         
         // Get today's date
         const today = new Date();
-        const currentMonth = today.getMonth() + 1; // January is 0, so we add 1 for human-readable month
+        const monthNumber = parseInt(month.split('-')[1].replace(/^0+/, ''));
 
-        //Get Current month name
-        const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
-        const currentMonthName = monthNames[currentMonth - 1];
+        //Get month name from month number
+        const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+        const currentMonthName = months[monthNumber - 1];
+        console.log('Current Month:', currentMonthName);
 
         // Filter transactions for the current month
         const filteredTransactions = transactionsData.filter(item => {
             const transactionMonth = (new Date(item.date)).getMonth() + 1;
-            return transactionMonth === currentMonth;
+            return transactionMonth === monthNumber;
         });
     
         // If there are no transactions for the current month, return
         if (filteredTransactions.length === 0) {
-            console.log('No transactions found for the current month.');
+            setError(`No transactions found for ${currentMonthName} ${today.getFullYear()}`);
             return;
         }
-    
+        
+        //if the transaction's outstanding balance for the month is not settled, alert the user
+        const outstandingBalance = filteredTransactions.some(transaction => transaction.outstandingBalance > 0);
+        if (outstandingBalance) {
+            setError('Outstanding balance for the month is not settled');
+            return;
+        }
+
+        //Delete transactions and payments of the selected month
+        const deleteTransactions = async () => {
+            if (!user) {
+                console.log('User not logged in');
+                return;
+            }
+            try {
+                const transactionsRef = collection(firestore, `users/${user.uid}/Suppliers/${params.supplierId}/Transactions`);
+                const transactionsQuery = query(transactionsRef, orderBy('timestamp', 'desc'));
+                const querySnapshot = await getDocs(transactionsQuery);
+                let transactions: any[] = [];
+                await Promise.all(querySnapshot.docs.map(async (doc) => {
+                    const transactionData = doc.data();
+                    const transactionId = doc.id;
+                    const transactionMonth = (new Date(transactionData.date)).getMonth() + 1;
+                    if (transactionMonth === monthNumber) {
+                        console.log('Deleting transaction:', transactionData);
+                        console.log('transactioMonth:', transactionMonth);
+                        await deleteDoc(doc.ref);
+                    }
+                }));
+
+                //also delete the payments inside the transactions
+                const paymentsRef = collection(firestore, `users/${user.uid}/Suppliers/${params.supplierId}/Transactions/${transactionId}/Payments`);
+                const paymentsQuery = query(paymentsRef, orderBy('timestamp', 'asc'));
+                const paymentsQuerySnapshot = await getDocs(paymentsQuery);
+                let payments: any[] = [];
+                await Promise.all(paymentsQuerySnapshot.docs.map(async (doc) => {
+                    const paymentData = doc.data();
+                    const paymentId = doc.id;
+                    const paymentMonth = (new Date(paymentData.cashPaymentDate || paymentData.chqPaymentDate)).getMonth() + 1;
+                    if (paymentMonth === monthNumber) {
+                        await deleteDoc(doc.ref);
+                    }
+                }));
+            } catch (error) {
+                console.error('Error deleting transactions:', error);
+            }
+        }
+
+
         // Create a new PDF document
         const doc = new jsPDF({ orientation: 'landscape' });
     
@@ -382,11 +442,11 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
                 '', // Empty cell for CHQ Realize Date
                 transaction.outstandingBalance,
             ];
-            transactionRow[7] = transaction.payments[0].cashPaymentDate || transaction.payments[0].chqPaymentDate;
-            transactionRow[8] = transaction.payments[0].chqNo || 'N/A';
-            transactionRow[9] = transaction.payments[0].chqIssuedBank || 'N/A';
-            transactionRow[10] = transaction.payments[0].cashPaymentAmount || transaction.payments[0].chequePaymentAmount;
-            transactionRow[11] = transaction.payments[0].chqRealizeDate || 'N/A';
+            transactionRow[7] = transaction.payments[0]?.cashPaymentDate || transaction.payments[0]?.chqPaymentDate;
+            transactionRow[8] = transaction.payments[0]?.chqNo || 'N/A';
+            transactionRow[9] = transaction.payments[0]?.chqIssuedBank || 'N/A';
+            transactionRow[10] = transaction.payments[0]?.cashPaymentAmount || transaction.payments[0]?.chequePaymentAmount;
+            transactionRow[11] = transaction.payments[0]?.chqRealizeDate || 'N/A';
             rows.push(transactionRow);
 
             //Payment rows - start the payments from index 1
@@ -442,6 +502,7 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
         // Save the PDF with a name
         const pdfName = `${supplierName} ${currentMonthName} ${today.getFullYear()} Transactions.pdf`;
         doc.save(pdfName);
+        deleteTransactions();
     };
     
     // Helper function to format date if needed
@@ -497,43 +558,43 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
                     Record Transaction
                 </button>
                 {transactionsData.length != 0 ? (
-                    <button className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded ml-4" onClick={generatePDF}>
+                    <button className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded ml-4" onClick={() => setViewExportPdfModal(true)}>
                     Export to PDF
                 </button>
                 ) : null}
             </div>
             <div>
-                <div className="flex gap-4 mb-5">
-                    <div className="flex flex-col">
-                        <label htmlFor="searchDateOne" className="block text-sm font-medium text-white">
-                            Filter from date
-                        </label>
-                        <input
-                            type="date"
-                            name="searchDateOne"
-                            id="searchDateOne"
-                            onChange={(e) => setSearchDateOne(e.target.value)}
-                            value={searchDateOne}
-                            className="mt-1 p-2 w-full border border-blue-500 rounded-md"
-                        />
-                    </div>
-                    <div className="flex flex-col">
-                        <label htmlFor="searchDateTwo" className="block text-sm font-medium text-white">
-                            Filter to date
-                        </label>
-                        <input
-                            type="date"
-                            name="searchDateTwo"
-                            id="searchDateTwo"
-                            onChange={(e) => setSearchDateTwo(e.target.value)}
-                            value={searchDateTwo}
-                            className="mt-1 p-2 w-full border border-blue-500 rounded-md"
-                        />
-                    </div>
-                </div>
             </div>
             {transactionsData.length != 0 ? (
                 <div className="overflow-x-auto">
+                    <div className="flex gap-4 mb-5">
+                        <div className="flex flex-col">
+                            <label htmlFor="searchDateOne" className="block text-sm font-medium text-white">
+                                Filter from date
+                            </label>
+                            <input
+                                type="date"
+                                name="searchDateOne"
+                                id="searchDateOne"
+                                onChange={(e) => setSearchDateOne(e.target.value)}
+                                value={searchDateOne}
+                                className="mt-1 p-2 w-full border border-blue-500 rounded-md"
+                            />
+                        </div>
+                        <div className="flex flex-col">
+                            <label htmlFor="searchDateTwo" className="block text-sm font-medium text-white">
+                                Filter to date
+                            </label>
+                            <input
+                                type="date"
+                                name="searchDateTwo"
+                                id="searchDateTwo"
+                                onChange={(e) => setSearchDateTwo(e.target.value)}
+                                value={searchDateTwo}
+                                className="mt-1 p-2 w-full border border-blue-500 rounded-md"
+                            />
+                        </div>
+                    </div>
                 <table className="w-full">
                     <thead>
                         <tr>
@@ -1034,6 +1095,68 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
                         <p className='font-semibold'>No payments have been recorded for this transaction!</p>
                     </div>
                     )}
+                </div>
+                </div>
+            </div>
+            )}
+
+            {/* Modal for Exporting PDF */}
+            {viewExportPdfModal && (
+            <div className="fixed inset-0 z-50">
+                <div className="flex items-center justify-center min-h-screen px-4">
+                {/* Background overlay */}
+                <div className="fixed inset-0 bg-black opacity-50"></div>
+
+                {/* Modal content */}
+                <div className="w-full bg-gray-800 rounded-lg overflow-hidden shadow-xl transform transition-all sm:max-w-2xl sm:w-full sm:m-10">
+                    {/* Close button */}
+                    <button
+                    className="absolute top-0 right-0 mt-4 mr-4 bg-gray-200 rounded-full p-2 hover:bg-gray-300"
+                    onClick={() => setViewExportPdfModal(false)}
+                    >
+                    <svg
+                        className="w-6 h-6 text-gray-600"
+                        fill="none"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth="2"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor"
+                    >
+                        <path d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                    </button>
+                    <div>
+                        <div className="bg-gray-800 py-4 px-6">
+                            <div>
+                                <div className='p-16'>
+                                    {error && 
+                                        <span className="text-red-500 mb-5 flex" onClick={() => setError('')}>
+                                            <p>{error}</p>
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="stroke-current shrink-0 h-6 w-6 ml-2" fill="none" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="7" stroke='red' d="M6 18L18 6M6 6l12 12"></path></svg>
+                                        </span>
+                                    }
+                                    <label htmlFor="month" className="block text-sm font-medium text-white">
+                                        Select Month to Export PDF
+                                    </label>
+                                    <input
+                                        type="month"
+                                        name="month"
+                                        id="month"
+                                        onChange={(e) => setMonthToExportPdf(e.target.value)}
+                                        value={monthToExportPdf}
+                                        className="mt-1 mb-5 p-2 w-full border border-blue-500 rounded-md"
+                                    />
+                                    <button
+                                        className="w-full btn btn-square bg-blue-500 text-white"
+                                        onClick={() => generatePDF(monthToExportPdf)}
+                                    >
+                                        Export to PDF
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
                 </div>
             </div>
