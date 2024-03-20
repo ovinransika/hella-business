@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { useSignInWithEmailAndPassword } from 'react-firebase-hooks/auth';
 import { auth } from '@/app/firebase/config';
+import Link from 'next/link';
 
 const SignIn = () => {
     const [email, setEmail] = useState('');
@@ -85,7 +86,6 @@ const SignIn = () => {
                             />
                         </div>
                     </div>
-
                     <div>
                         <button
                             type="submit"
@@ -93,6 +93,13 @@ const SignIn = () => {
                         >
                             Sign In
                         </button>
+                    </div>
+                    <div>
+                        <Link href="/forgotPassword">
+                            <p className='text-center text-indigo-600 hover:text-indigo-500 cursor-pointer'>
+                                Forgot your password?
+                            </p>
+                        </Link>
                     </div>
                 </form>
             </div>

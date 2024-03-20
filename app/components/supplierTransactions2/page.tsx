@@ -5,7 +5,6 @@ import { auth, firestore } from '@/app/firebase/config';
 import { collection, addDoc, getDocs, doc, getDoc, setDoc, query, orderBy, Query, DocumentData, deleteDoc } from 'firebase/firestore';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
-import { set } from 'firebase/database';
 
 const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) => {
     const [currentPage, setCurrentPage] = useState(1);
