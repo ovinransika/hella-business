@@ -3,7 +3,7 @@ import React, { useState } from "react";
 import { sendPasswordResetEmail } from "firebase/auth";
 import { auth } from '@/app/firebase/config';
 
-const forgotPassword = () => {
+const ForgotPassword = () => {
 
     const [email, setEmail] = useState('');
     const [error, setError] = useState('');
@@ -63,4 +63,4 @@ const forgotPassword = () => {
   )
 }
 
-export default forgotPassword;
+export default ForgotPassword;
