@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, firestore } from '@/app/firebase/config';
-import { collection, addDoc, getDocs, doc, getDoc, setDoc, query, orderBy, Query, DocumentData, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, doc, getDoc, setDoc, query, orderBy, Query, DocumentData, deleteDoc, writeBatch, updateDoc } from 'firebase/firestore';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
@@ -17,6 +17,8 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
     const [transactionsData, setTransactionsData] = useState<any[]>([]);
     const [paymentsData, setPaymentsData] = useState<any[]>([]);
     const [totalDue, setTotalDue] = useState(0);
+    const [totalDueToPay, setTotalDueToPay] = useState('');
+    const [payTotalDue, setPayTotalDue] = useState(false);
 
     const [modalOpen, setModalOpen] = useState(false);
     const [paymentModalOpen, setPaymentModalOpen] = useState(false);
@@ -113,82 +115,156 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
 
     const recordPayment = async () => {
         setPaymentModalOpen(false);
-        if(!user){
+        if (!user) {
             alert('Please login to continue');
             console.log('User not logged in');
             return;
         }
-
-        try{
-            const transactionRef = doc(firestore, `users/${user?.uid}/Suppliers/${params.supplierId}/Transactions/${transactionId}`);
-            const transactionDoc = await getDoc(transactionRef);
-            if (transactionDoc.exists()) {
-                let paymentAmount = Number(cashPaymentDetails.cashPaymentAmount || chequePaymentDetails.chequePaymentAmount);
-                let outstandingBalanceAmount = Number(transactionDoc.data().outstandingBalance);
-                if (outstandingBalanceAmount <= 0) {
-                    setOutstandingBalanceZeroAlert(true);
-                    setPaymentModalOpen(false);
-                } else if(outstandingBalanceAmount < paymentAmount){
-                    console.log('Outstanding Balance:', outstandingBalanceAmount);
-                    console.log('Cash Payment Amount:', paymentAmount);
-                    setOutstandingBalanceExceedsAlert(true);
-                    setPaymentModalOpen(false);     
-                } else {
-                    const timestamp = new Date();
-                    const paymentRef = collection(firestore, `users/${user.uid}/Suppliers/${params.supplierId}/Transactions/${transactionId}/Payments`);
-                    if(paymentModeCash === true){
-                        if(cashPaymentDetails.cashPaymentAmount === '' || cashPaymentDetails.cashPaymentDate === ''){
+        if (payTotalDue) {
+            // Get all supplier transactions and process payment deduction
+            try {
+                const transactionsRef = query(collection(firestore, `users/${user.uid}/Suppliers/${params.supplierId}/Transactions`), orderBy('date', 'asc'));
+                const transactionsSnapshot = await getDocs(transactionsRef);
+                let remainingPayment = Number(cashPaymentDetails.cashPaymentAmount || chequePaymentDetails.chequePaymentAmount);
+    
+                for (const transactionDoc of transactionsSnapshot.docs) {
+                    const transactionData = transactionDoc.data();
+                    const outstandingBalance = Number(transactionData.outstandingBalance);
+    
+                    if (outstandingBalance <= 0) {
+                        continue; // Skip transactions with zero or negative balances
+                    }
+    
+                    if (remainingPayment <= 0) {
+                        break; // No remaining payment to apply
+                    }
+    
+                    let paymentToApply = Math.min(outstandingBalance, remainingPayment);
+    
+                    const transactionRef = doc(firestore, `users/${user.uid}/Suppliers/${params.supplierId}/Transactions/${transactionDoc.id}`);
+                    await updateDoc(transactionRef, {
+                        outstandingBalance: outstandingBalance - paymentToApply,
+                    });
+    
+                    // Add a payment document to the transaction
+                    const paymentRef = collection(transactionRef, 'Payments');
+                    if (paymentModeCash) {
+                        if (cashPaymentDetails.cashPaymentAmount === '' || cashPaymentDetails.cashPaymentDate === '') {
                             alert('Please fill all required fields');
                             return;
-                        }else{
+                        } else {
                             await addDoc(paymentRef, {
-                                ...cashPaymentDetails,
-                                timestamp: timestamp,
+                                ...cashPaymentDetails, 
+                                timestamp: new Date(),
                             });
                         }
                     } else {
-                        if(chequePaymentDetails.chqPaymentDate === '' || chequePaymentDetails.chqNo === '' || chequePaymentDetails.chqIssuedBank === '' || chequePaymentDetails.chequePaymentAmount === ''){
+                        if (chequePaymentDetails.chqPaymentDate === '' || chequePaymentDetails.chqNo === '' || chequePaymentDetails.chqIssuedBank === '' || chequePaymentDetails.chequePaymentAmount === '') {
                             alert('Please fill all required fields');
                             return;
+                        } else {
+                            await addDoc(paymentRef, {
+                                ...chequePaymentDetails, 
+                                timestamp: new Date(),
+                            });
+                        }
+                    }
+    
+                    remainingPayment -= paymentToApply;
+                }
+    
+                // Update Supplier's Total Due after applying payment
+                const supplierRef = doc(firestore, `users/${user.uid}/Suppliers/${params.supplierId}`);
+                const supplierDoc = await getDoc(supplierRef);
+    
+                if (supplierDoc.exists()) {
+                    const newTotalDue = Math.max(Number(supplierDoc.data().totalDue) - Number(cashPaymentDetails.cashPaymentAmount || chequePaymentDetails.chequePaymentAmount), 0);
+                    await setDoc(supplierRef, { totalDue: newTotalDue }, { merge: true });
+                }
+    
+                window.location.reload();
+            } catch (error) {
+                console.log('Error processing payment:', error);
+            }
+        } else {
+            // Handle individual transaction payment
+            try {
+                const transactionRef = doc(firestore, `users/${user?.uid}/Suppliers/${params.supplierId}/Transactions/${transactionId}`);
+                const transactionDoc = await getDoc(transactionRef);
+    
+                if (transactionDoc.exists()) {
+                    let paymentAmount = Number(cashPaymentDetails.cashPaymentAmount || chequePaymentDetails.chequePaymentAmount);
+                    let outstandingBalanceAmount = Number(transactionDoc.data().outstandingBalance);
+    
+                    if (outstandingBalanceAmount <= 0) {
+                        setOutstandingBalanceZeroAlert(true);
+                        setPaymentModalOpen(false);
+                    } else if (outstandingBalanceAmount < paymentAmount) {
+                        console.log('Outstanding Balance:', outstandingBalanceAmount);
+                        console.log('Cash Payment Amount:', paymentAmount);
+                        setOutstandingBalanceExceedsAlert(true);
+                        setPaymentModalOpen(false);
                     } else {
-                        await addDoc(paymentRef, {
-                            ...chequePaymentDetails,
-                            timestamp: timestamp,
-                        });
+                        const timestamp = new Date();
+                        const paymentRef = collection(firestore, `users/${user.uid}/Suppliers/${params.supplierId}/Transactions/${transactionId}/Payments`);
+    
+                        if (paymentModeCash) {
+                            if (cashPaymentDetails.cashPaymentAmount === '' || cashPaymentDetails.cashPaymentDate === '') {
+                                alert('Please fill all required fields');
+                                return;
+                            } else {
+                                await addDoc(paymentRef, {
+                                    ...cashPaymentDetails, 
+                                    timestamp: new Date(),
+                                });
+                            }
+                        } else {
+                            if (chequePaymentDetails.chqPaymentDate === '' || chequePaymentDetails.chqNo === '' || chequePaymentDetails.chqIssuedBank === '' || chequePaymentDetails.chequePaymentAmount === '') {
+                                alert('Please fill all required fields');
+                                return;
+                            } else {
+                                await addDoc(paymentRef, {
+                                    ...chequePaymentDetails, 
+                                    timestamp: new Date(),
+                                });
+                                const supplierRef = doc(firestore, `users/${user?.uid}/Suppliers/${params.supplierId}`);
+                                const supplierDoc = await getDoc(supplierRef);
+                                const chqRef = collection(firestore, `users/${user.uid}/Cheques`);
+                                const supplierData = supplierDoc.data();
+                                await addDoc(chqRef, {
+                                    chqNo: chequePaymentDetails.chqNo,
+                                    chqIssuedBank: chequePaymentDetails.chqIssuedBank,
+                                    chqAmount: chequePaymentDetails.chequePaymentAmount,
+                                    chqIssueDate: chequePaymentDetails.chqPaymentDate,
+                                    chqRealizeDate: chequePaymentDetails.chqRealizeDate,
+                                    chqSupplierId: params.supplierId,
+                                    chqSupplierName: supplierData?.name ?? '',
+                                    timestamp: timestamp, // Add timestamp to the transaction
+                                });
+                            }
+                        }
+                        const newOutstandingBalance = Number(transactionDoc.data().outstandingBalance) - paymentAmount;
+                        await setDoc(transactionRef, { outstandingBalance: newOutstandingBalance }, { merge: true });
+    
+                        // Update Supplier's Total Due after applying payment
                         const supplierRef = doc(firestore, `users/${user?.uid}/Suppliers/${params.supplierId}`);
                         const supplierDoc = await getDoc(supplierRef);
-                        const chqRef = collection(firestore, `users/${user.uid}/Cheques`);
-                        const supplierData = supplierDoc.data();
-                        await addDoc(chqRef, {
-                            chqNo: chequePaymentDetails.chqNo,
-                            chqIssuedBank: chequePaymentDetails.chqIssuedBank,
-                            chqAmount: chequePaymentDetails.chequePaymentAmount,
-                            chqIssueDate: chequePaymentDetails.chqPaymentDate,
-                            chqRealizeDate: chequePaymentDetails.chqRealizeDate,
-                            chqSupplierId: params.supplierId,
-                            chqSupplierName: supplierData?.name ?? '',
-                            timestamp: timestamp, // Add timestamp to the transaction
-                        });
+    
+                        if (supplierDoc.exists()) {
+                            const newTotalDue = Math.max(Number(supplierDoc.data().totalDue) - paymentAmount, 0);
+                            await setDoc(supplierRef, { totalDue: newTotalDue }, { merge: true });
+                        }
+    
+                        window.location.reload();
                     }
-                    }
-                    const newOutstandingBalance = Number(transactionDoc.data().outstandingBalance) - Number(cashPaymentDetails.cashPaymentAmount || chequePaymentDetails.chequePaymentAmount);
-                    await setDoc(transactionRef, { outstandingBalance: newOutstandingBalance }, { merge: true });
-
-                    //Get Supplier's Total Due and deduct the payment amount from it
-                    const supplierRef = doc(firestore, `users/${user?.uid}/Suppliers/${params.supplierId}`);
-                    const supplierDoc = await getDoc(supplierRef);
-                    if (supplierDoc.exists()) {
-                        const newTotalDue = Number(supplierDoc.data().totalDue) - Number(cashPaymentDetails.cashPaymentAmount || chequePaymentDetails.chequePaymentAmount);
-                        await setDoc(supplierRef, { totalDue: newTotalDue }, { merge: true });
-                    }
-
-                    window.location.reload();
                 }
+            } catch (error) {
+                console.log('Error adding payment:', error);
             }
-        }catch (error){
-            console.log('Error adding payment');
         }
-    }
+    };
+    
+
 
     const getTransactions = async () => {
         if (!user) {
@@ -200,7 +276,7 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
             const transactionsRef = collection(firestore, `users/${user.uid}/Suppliers/${params.supplierId}/Transactions`);
     
             // Create a query to order transactions by timestamp in descending order
-            const transactionsQuery = query(transactionsRef, orderBy('timestamp', 'desc'));
+            const transactionsQuery = query(transactionsRef, orderBy('date', 'asc'));
     
             const querySnapshot = await getDocs(transactionsQuery);
     
@@ -230,6 +306,11 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
         setPaymentModalOpen(true);
         setTransactionId(id);
 
+    }
+
+    const handleTotalDuePayClick = () => {
+        setPaymentModalOpen(true);
+        setPayTotalDue(true);
     }
 
     const getPaymentData = async (id: string) => {
@@ -301,7 +382,7 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
         }
     };
 
-    function getSupplierName() {
+    function getSupplierDetails() {
         if (!user) {
             console.log('User not logged in');
             return;
@@ -311,6 +392,9 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
         getDoc(supplierRef).then((doc) => {
             if (doc.exists()) {
                 const name = doc.data()?.name;
+                const totalDue = doc.data()?.totalDue;
+                console.log(doc.data()?.totalDue);
+                setTotalDueToPay(totalDue);
                 setSupplierName(name);
             } else {
                 // doc.data() will be undefined in this case
@@ -522,7 +606,7 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
     useEffect(() => {
         if (user) {
             getTransactions();
-            getSupplierName();
+            getSupplierDetails();
         }
     }, [user]);
 
@@ -557,8 +641,8 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
                     Record Transaction
                 </button>
                 {transactionsData.length != 0 ? (
-                    <button className="bg-green-500 hover:bg-green-700 text-white font-bold py-2 px-4 rounded ml-4" onClick={() => setViewExportPdfModal(true)}>
-                    Export to PDF
+                    <button className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded ml-4" onClick={() => setViewExportPdfModal(true)}>
+                    Export to PDF & Clear Database
                 </button>
                 ) : null}
             </div>
@@ -593,6 +677,13 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
                                 className="mt-1 p-2 w-full border border-blue-500 rounded-md"
                             />
                         </div>
+                    </div>
+                    <div className='flex w-1/3 mb-5 items-center'>
+                        <p className="text-white font-semibold">Total Due: Rs.{totalDueToPay}</p>
+                        <button className="bg-lime-500 hover:bg-lime-700 text-white font-bold py-2 px-4 rounded ml-auto"
+                        onClick={() => handleTotalDuePayClick()}>
+                            Pay Total Due
+                        </button>
                     </div>
                 <table className="w-full">
                     <thead>
