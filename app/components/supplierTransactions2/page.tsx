@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, firestore } from '@/app/firebase/config';
-import { collection, addDoc, getDocs, doc, getDoc, setDoc, query, orderBy, Query, DocumentData, deleteDoc, writeBatch, updateDoc } from 'firebase/firestore';
+import { collection, addDoc, getDocs, doc, getDoc, setDoc, query, orderBy, deleteDoc, updateDoc } from 'firebase/firestore';
 import jsPDF from 'jspdf';
 import 'jspdf-autotable';
 
@@ -43,6 +43,7 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
         paymentMethod: 'cash',
         cashPaymentDate: '',
         cashPaymentAmount: '',
+        paymentRemark: '',
     });
 
     const [chequePaymentDetails, setChequePaymentDetails] = useState({
@@ -51,7 +52,8 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
         chqIssuedBank: '',
         chqPaymentDate: '',
         chqRealizeDate: '',
-        chequePaymentAmount: ''
+        chequePaymentAmount: '',
+        paymentRemark: '',
     });
 
     const [searchDateOne, setSearchDateOne] = useState('');
@@ -607,7 +609,6 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
     }
     
     
-    
     useEffect(() => {
         if (user) {
             getTransactions();
@@ -981,6 +982,19 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
                                                     />
                                                 </div>
                                             </div>
+                                            <div className="w-full mb-4">
+                                                        <label htmlFor="paymentRemark" className="block text-sm font-medium text-white">
+                                                            Cash Payment Remark
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            name="paymentRemark"
+                                                            id="paymentRemark"
+                                                            onChange={handlePaymentInputChange}
+                                                            value={cashPaymentDetails.paymentRemark}
+                                                            className="mt-1 p-2 w-full border border-blue-500 rounded-md"
+                                                        />
+                                                    </div>
                                                 </>
 
                                             ) : (
@@ -1053,6 +1067,19 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
                                                                 className="mt-1 p-2 w-full border border-blue-500 rounded-md"
                                                             />
                                                         </div>
+                                                    </div>
+                                                    <div className="w-full mb-4">
+                                                        <label htmlFor="paymentRemark" className="block text-sm font-medium text-white">
+                                                            CHQ Payment Remark
+                                                        </label>
+                                                        <input
+                                                            type="text"
+                                                            name="paymentRemark"
+                                                            id="paymentRemark"
+                                                            onChange={handlePaymentInputChange}
+                                                            value={chequePaymentDetails.paymentRemark}
+                                                            className="mt-1 p-2 w-full border border-blue-500 rounded-md"
+                                                        />
                                                     </div>
                                                 </>
                                             )}
