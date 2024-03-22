@@ -146,6 +146,9 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
                         }
         
                         let paymentToApply = Math.min(outstandingBalance, remainingPayment);
+
+                        console.log('paid:', paymentToApply);
+
         
                         const transactionRef = doc(firestore, `users/${user.uid}/Suppliers/${params.supplierId}/Transactions/${transactionDoc.id}`);
                         await updateDoc(transactionRef, {
@@ -160,7 +163,10 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
                                 return;
                             } else {
                                 await addDoc(paymentRef, {
-                                    ...cashPaymentDetails, 
+                                    paymentMethod: cashPaymentDetails.paymentMethod,
+                                    cashPaymentDate: cashPaymentDetails.cashPaymentDate,
+                                    cashPaymentAmount: paymentToApply, 
+                                    paymentRemark: cashPaymentDetails.paymentRemark,
                                     timestamp: new Date(),
                                 });
                             }
@@ -170,9 +176,29 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
                                 return;
                             } else {
                                 await addDoc(paymentRef, {
-                                    ...chequePaymentDetails, 
+                                    paymentMethod: chequePaymentDetails.paymentMethod,
+                                    chqNo: chequePaymentDetails.chqNo,
+                                    chqIssuedBank: chequePaymentDetails.chqIssuedBank,
+                                    chqPaymentDate: chequePaymentDetails.chqPaymentDate,
+                                    chqRealizeDate: chequePaymentDetails.chqRealizeDate,
+                                    chequePaymentAmount: paymentToApply,
+                                    paymentRemark: chequePaymentDetails.paymentRemark,
                                     timestamp: new Date(),
                                 });
+                                const supplierRef = doc(firestore, `users/${user?.uid}/Suppliers/${params.supplierId}`);
+                                    const supplierDoc = await getDoc(supplierRef);
+                                    const chqRef = collection(firestore, `users/${user.uid}/Cheques`);
+                                    const supplierData = supplierDoc.data();
+                                    await addDoc(chqRef, {
+                                        chqNo: chequePaymentDetails.chqNo,
+                                        chqIssuedBank: chequePaymentDetails.chqIssuedBank,
+                                        chqAmount: paymentToApply,
+                                        chqIssueDate: chequePaymentDetails.chqPaymentDate,
+                                        chqRealizeDate: chequePaymentDetails.chqRealizeDate,
+                                        chqSupplierId: params.supplierId,
+                                        chqSupplierName: supplierData?.name ?? '',
+                                        timestamp: new Date(), // Add timestamp to the transaction
+                                    });
                             }
                         }
         
@@ -188,7 +214,7 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
                         await setDoc(supplierRef, { totalDue: newTotalDue }, { merge: true });
                     }
         
-                    window.location.reload();
+                    //window.location.reload();
                 } catch (error) {
                     console.log('Error processing payment:', error);
                 }
@@ -261,7 +287,7 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
                                 await setDoc(supplierRef, { totalDue: newTotalDue }, { merge: true });
                             }
         
-                            window.location.reload();
+                            //window.location.reload();
                         }
                     }
                 } catch (error) {
@@ -271,8 +297,6 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
         }
     };
     
-
-
     const getTransactions = async () => {
         if (!user) {
             console.log('User not logged in');

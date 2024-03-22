@@ -130,7 +130,7 @@ const Suppliers = () => {
                         checked={filterBy === 'cmbSupplier'}
                         onChange={() => setFilterBy('cmbSupplier')}
                     />
-                    <span className="ml-2">cmbSupplier</span>
+                    <span className="ml-2">Colombo Supplier</span>
                 </label>
                 <label className="inline-flex items-center ml-4">
                     <input
@@ -140,7 +140,7 @@ const Suppliers = () => {
                         checked={filterBy === 'fridaySupplier'}
                         onChange={() => setFilterBy('fridaySupplier')}
                     />
-                    <span className="ml-2">fridaySupplier</span>
+                    <span className="ml-2">Friday Supplier</span>
                 </label>
             </div>
 
