@@ -1,4 +1,4 @@
-'use client'
+'use client';
 import React, { useEffect, useState } from 'react';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, firestore } from '@/app/firebase/config';
@@ -12,13 +12,23 @@ const Suppliers = () => {
     const [supplierIdToDelete, setSupplierIdToDelete] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
     const [searchTerm, setSearchTerm] = useState('');
+    const [filterBy, setFilterBy] = useState('cmbSupplier'); // Added state for filter
 
     const itemsPerPage = 10;
 
     // Declare filteredSuppliers here
-    const filteredSuppliers = suppliers.filter(supplier =>
-        supplier.name.toLowerCase().includes(searchTerm.toLowerCase())
-    );
+    const filteredSuppliers = suppliers.filter(supplier => {
+        const searchText = searchTerm.toLowerCase();
+        const nameMatches = supplier.name.toLowerCase().includes(searchText);
+
+        // Filter based on name and selected filter
+        if (filterBy === 'cmbSupplier') {
+            return nameMatches && supplier.cmbSupplier;
+        } else if (filterBy === 'fridaySupplier') {
+            return nameMatches && !supplier.cmbSupplier; // false means it's a fridaySupplier
+        }
+        return nameMatches;
+    });
 
     const totalPages = Math.ceil(filteredSuppliers.length / itemsPerPage);
 
@@ -108,6 +118,32 @@ const Suppliers = () => {
                     </Link>
                 </div>
             </div>
+
+            {/* Filter by Radio Buttons */}
+            <div className="flex items-center mb-4">
+                <span className="mr-2">Filter by:</span>
+                <label className="inline-flex items-center">
+                    <input
+                        type="radio"
+                        className="form-radio"
+                        value="cmbSupplier"
+                        checked={filterBy === 'cmbSupplier'}
+                        onChange={() => setFilterBy('cmbSupplier')}
+                    />
+                    <span className="ml-2">cmbSupplier</span>
+                </label>
+                <label className="inline-flex items-center ml-4">
+                    <input
+                        type="radio"
+                        className="form-radio"
+                        value="fridaySupplier"
+                        checked={filterBy === 'fridaySupplier'}
+                        onChange={() => setFilterBy('fridaySupplier')}
+                    />
+                    <span className="ml-2">fridaySupplier</span>
+                </label>
+            </div>
+
             <div className="overflow-x-auto">
                 <table className="min-w-full divide-y divide-gray-200">
                     <thead className="bg-gray-50">
@@ -143,7 +179,7 @@ const Suppliers = () => {
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">{item.companyName}</td>
                                     <td className="px-6 py-4 whitespace-nowrap">{item.contactNo}</td>
-                                    <td className="px-6 py-4 whitespace-nowrap">{item.email}</td>
+                                    <td                                     className="px-6 py-4 whitespace-nowrap">{item.email}</td>
                                     <td className="px-6 py-4 whitespace-nowrap">LKR {item.totalDue}</td>
                                     <td className="px-6 py-4 whitespace-nowrap">
                                         <button className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded ml-2" onClick={() => deleteSupplier(item.id)}>
@@ -189,7 +225,7 @@ const Suppliers = () => {
                                 </div>
                             </div>
                             <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse flex">
-                                <button onClick={confirmDeleteSupplier} type="button" className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red 700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm">
+                                <button onClick={confirmDeleteSupplier} type="button" className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm">
                                     Delete Supplier?
                                 </button>
                                 <button onClick={cancelDelete} type="button" className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm">
@@ -206,3 +242,4 @@ const Suppliers = () => {
 };
 
 export default Suppliers;
+

@@ -13,6 +13,7 @@ const AddSuppliers = () => {
     const [supplierContactNo, setSupplierContactNo] = useState('');
     const [supplierEmail, setSupplierEmail] = useState('');
     const [supplierTotalDue, setSupplierTotalDue] = useState('');
+    const [cmbSupplier, setCmbSupplier] = useState(false);
 
     // Error States
     const [nameError, setNameError] = useState('');
@@ -65,7 +66,8 @@ const AddSuppliers = () => {
                 companyName: supplierCompanyName,
                 contactNo: supplierContactNo,
                 email: supplierEmail,
-                totalDue: '0'
+                totalDue: '0',
+                cmbSupplier: cmbSupplier
             });
 
             if (docRef) {
@@ -145,6 +147,16 @@ const AddSuppliers = () => {
                         value={supplierEmail}
                         onChange={(e) => setSupplierEmail(e.target.value)}
                     />
+                    {emailError && <p className="text-red-500 text-xs">{emailError}</p>}
+                </div>
+                <div className='mb-4'>
+                    <div className='flex gap-5'>
+                        <input type="radio" id="type1" name="type" value="type1" onClick={() => setCmbSupplier(false)} />
+                        <label htmlFor="type1">Friday Supplier</label>
+
+                        <input type="radio" id="type2" name="type" value="type2" onClick={() => setCmbSupplier(true)}/>
+                        <label htmlFor="type2">Colombo Supplier</label>
+                    </div>
                     {emailError && <p className="text-red-500 text-xs">{emailError}</p>}
                 </div>
                 <button
