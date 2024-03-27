@@ -85,6 +85,21 @@ const Suppliers = () => {
                 });
             });
 
+            //Delete Damages and Returns
+            const damagesCollection = collection(supplierDocRef, 'Damages');
+            const damagesQuerySnapshot = await getDocs(damagesCollection);
+
+            damagesQuerySnapshot.forEach(async (damageDoc) => {
+                await deleteDoc(damageDoc.ref);
+            });
+
+            const returnsCollection = collection(supplierDocRef, 'Returns');
+            const returnsQuerySnapshot = await getDocs(returnsCollection);
+
+            returnsQuerySnapshot.forEach(async (returnDoc) => {
+                await deleteDoc(returnDoc.ref);
+            });
+
             await deleteDoc(supplierDocRef);
 
             getSuppliers();

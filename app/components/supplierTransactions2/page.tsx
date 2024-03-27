@@ -22,10 +22,12 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
 
     const [modalOpen, setModalOpen] = useState(false);
     const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+    const [updateTransactionModal, setUpdateTransactionModal] = useState(false);
     const [viewPaymentsModal, setViewPaymentsModal] = useState(false);
     const [viewCashPayments, setViewCashPayments] = useState(false);
     const [viewExportPdfModal, setViewExportPdfModal] = useState(false);
     const [paymentModeCash, setPaymentModeCash] = useState(false);
+    const [UpdateDamage, setUpdateDamage] = useState(false);
     const [outstandingBalanceZeroAlert, setOutstandingBalanceZeroAlert] = useState(false);
     const [outstandingBalanceExceedsAlert, setOutstandingBalanceExceedsAlert] = useState(false);
     const [transactionDetails, setTransactionDetails] = useState({
@@ -54,6 +56,19 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
         chqRealizeDate: '',
         chequePaymentAmount: '',
         paymentRemark: '',
+    });
+
+    const [damageDetails, setDamageDetails] = useState({
+        date: '',
+        invoiceNo: '',
+        damageTotal: '',
+    });
+
+    const [returnDetails, setReturnDetails] = useState({
+        date: '',
+        invoiceNo: '',
+        returnNo: '',
+        returnTotal: '',
     });
 
     const [searchDateOne, setSearchDateOne] = useState('');
@@ -332,6 +347,70 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
             }
         }
     };
+
+    const recordDmgRtn = async () => {
+        setUpdateTransactionModal(false);
+        if (!user) {
+            alert('Please login to continue');
+            console.log('User not logged in');
+            return;
+        }
+
+        try {
+            const timestamp = new Date();
+
+            if (UpdateDamage) {
+                if (!damageDetails.date || !damageDetails.invoiceNo || !damageDetails.damageTotal) {
+                    alert('Please fill all required fields');
+                    return;
+                } else {
+                    const damagesRef = collection(firestore, `users/${user.uid}/Suppliers/${params.supplierId}/Damages`);
+                    await addDoc(damagesRef, {
+                        ...damageDetails,
+                        timestamp: timestamp,
+                    });
+
+                    //Add the damageTotal to the supplier's totalDamage
+                    const supplierRef = doc(firestore, `users/${user.uid}/Suppliers/${params.supplierId}`);
+                    const supplierDoc = await getDoc(supplierRef);
+                    if (supplierDoc.exists()) {
+                        const newTotalDamage = Number(supplierDoc.data().totalDamage) + Number(damageDetails.damageTotal);
+                        await setDoc(supplierRef, { totalDamage: newTotalDamage }, { merge: true });
+                    }
+
+                    //Deduct the damageTotal from the supplier's totalDue
+                    const newTotalDue = Number(supplierDoc.data()?.totalDue) - Number(damageDetails.damageTotal);
+                    await setDoc(supplierRef, { totalDue: newTotalDue }, { merge: true });
+                }
+            } else {
+                if (!returnDetails.date || !returnDetails.invoiceNo || !returnDetails.returnNo || !returnDetails.returnTotal) {
+                    alert('Please fill all required fields');
+                    return;
+                } else {
+                    const returnsRef = collection(firestore, `users/${user.uid}/Suppliers/${params.supplierId}/Returns`);
+                    await addDoc(returnsRef, {
+                        ...returnDetails,
+                        timestamp: timestamp,
+                    });
+
+                    //Add the returnTotal to the supplier's totalReturns
+                    const supplierRef = doc(firestore, `users/${user.uid}/Suppliers/${params.supplierId}`);
+                    const supplierDoc = await getDoc(supplierRef);
+                    if (supplierDoc.exists()) {
+                        const newTotalReturns = Number(supplierDoc.data().totalReturns) + Number(returnDetails.returnTotal);
+                        await setDoc(supplierRef, { totalReturns: newTotalReturns }, { merge: true });
+                    }
+
+                    //Deduct the returnTotal from the supplier's totalDue
+                    const newTotalDue = Number(supplierDoc.data()?.totalDue) - Number(returnDetails.returnTotal);
+                    await setDoc(supplierRef, { totalDue: newTotalDue }, { merge: true });
+                }
+            }
+            window.location.reload();
+        } catch (error) {
+            console.log('Error adding damage/return:', error);
+        }
+    }
     
     const getTransactions = async () => {
         if (!user) {
@@ -378,6 +457,22 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
     const handleTotalDuePayClick = () => {
         setPaymentModalOpen(true);
         setPayTotalDue(true);
+    }
+
+    const handleDmgRtnClose = () => {
+        setUpdateTransactionModal(false);
+        setDamageDetails({
+            date: '',
+            invoiceNo: '',
+            damageTotal: '',
+        });
+
+        setReturnDetails({
+            date: '',
+            invoiceNo: '',
+            returnNo: '',
+            returnTotal: '',
+        });
     }
 
     const getPaymentData = async (id: string) => {
@@ -446,6 +541,26 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
             };
 
             setChequePaymentDetails(newChequePaymentDetails);
+        }
+    };
+
+    const handleDmgRtnInputChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        if(UpdateDamage){
+            const { name, value } = e.target;
+            let newDamageDetails = {
+                ...damageDetails,
+                [name]: value,
+            };
+            setDamageDetails(newDamageDetails);
+            
+        } else {
+            const { name, value } = e.target;
+            let newReturnDetails = {
+                ...returnDetails,
+                [name]: value,
+            };
+
+            setReturnDetails(newReturnDetails);
         }
     };
 
@@ -703,15 +818,27 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
         <div style={{ borderRadius: '10px' }} className="mt-10 p-10 bg-neutral-700">
             <div className="flex mb-5">
                 <h1 className="text-2xl font-semibold mb-5">Supplier Transactions</h1>
-                <button className="bg-black hover:bg-white hover:text-red-800 text-white font-bold py-2 px-4 rounded ml-auto" onClick={() => setModalOpen(true)}>
-                    Record Transaction
-                </button>
-                {transactionsData.length != 0 ? (
-                    <button className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-4 rounded ml-4" onClick={() => setViewExportPdfModal(true)}>
-                    Export to PDF & Clear Database
-                </button>
-                ) : null}
+                <div className='flex-col ml-auto'>
+                    <div className='flex gap-2 mb-2'>
+                        <button className="bg-black hover:bg-white hover:text-red-800 text-white font-bold py-2 px-4 rounded ml-auto" onClick={() => setModalOpen(true)}>
+                            Record Transaction
+                        </button>
+                        {transactionsData.length != 0 ? (
+                            <button className="bg-orange-500 hover:bg-orange-800 text-white font-bold py-2 px-4 rounded ml-auto" onClick={() => setUpdateTransactionModal(true)}>
+                                Record Damage & Return
+                            </button>
+                        ) : null} 
+                    </div>
+                    <div className='ml-auto'> 
+                    {transactionsData.length != 0 ? (
+                        <button className="bg-red-500 hover:bg-red-700 text-white font-bold py-2 px-24 rounded ml-4" onClick={() => setViewExportPdfModal(true)}>
+                            Export to PDF & Clear Database
+                        </button>
+                    ) : null}
+                    </div>
+                </div>
             </div>
+        
             <div>
             </div>
             {transactionsData.length != 0 ? (
@@ -1157,6 +1284,183 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
                                 </button>
                                 <button
                                     onClick={() => setPaymentModalOpen(false)}
+                                    type="button"
+                                    className="mt-3 w-full inline-flex justify-center rounded-md shadow-sm px-4 py-2 bg-red-500 text-base font-medium text-white hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </> 
+            )
+            }
+
+            {/* Modal for Updating Damage and Returns */}
+            {updateTransactionModal && (
+            <>
+                {/* Give option to select payment mode */}
+                <div className="fixed z-10 inset-0 overflow-y-auto">
+                    <div className="flex items-end justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+                        <div className="fixed inset-0 transition-opacity">
+                            <div className="absolute inset-0 bg-black opacity-50"></div>
+                        </div>
+                        <span className="hidden sm:inline-block sm:align-middle sm:h-screen"></span>&#8203;
+                        <div
+                            className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full"
+                            role="dialog"
+                            aria-modal="true"
+                            aria-labelledby="modal-headline"
+                        >
+                            <div className="bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                                <div>
+                                    <div className="mt-3 text-center sm:text-left">
+                                    <div className="flex p-2">
+                                        <h2 className="text-xl font-semibold mb-4">Update Transaction</h2>
+                                        <button className="btn btn-square bg-red-500 text-white ml-auto" onClick={() => handleDmgRtnClose()}>X</button>
+                                    </div>
+                                        <div className="mt-2">
+                                            <div className="flex flex-col sm:flex-row">
+                                            <div className="w-full sm:pr-2 mb-4">
+                                                <label htmlFor="recordPick" className="block text-sm font-medium text-white">
+                                                    Pick what to record
+                                                </label>
+                                                <select
+                                                    name="recordPick"
+                                                    id="recordPick"
+                                                    onChange={(e) => setUpdateDamage(e.target.value === "damage")}
+                                                    value={UpdateDamage ? "damage" : "returns"}
+                                                    className="mt-1 p-2 w-full border border-blue-500 rounded-md"
+                                                >
+                                                    <option value="damage">Record Damage</option>
+                                                    <option value="returns">Record Returns</option>
+                                                </select>
+                                            </div>
+                                            </div>
+                                            {UpdateDamage ? (
+                                                <>
+                                            <div className="w-full sm:pr-2 mb-4">
+                                                <label htmlFor="date" className="block text-sm font-medium text-white">
+                                                    Damage Date
+                                                </label>
+                                                <input
+                                                    type="date"
+                                                    name="date"
+                                                    id="date"
+                                                    className="mt-1 p-2 w-full border border-blue-500 rounded-md"
+                                                    onChange={handleDmgRtnInputChange}
+                                                    value={damageDetails.date}
+                                                />
+                                            </div>
+                                            <div className="flex flex-col sm:flex-row">
+                                                <div className="w-full sm:pr-2 mb-4">
+                                                <label htmlFor="invoiceNo" className="block text-sm font-medium text-white">
+                                                    Invoice No related to the damage
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    name="invoiceNo"
+                                                    id="invoiceNo"
+                                                    className="mt-1 p-2 w-full border border-blue-500 rounded-md"
+                                                    onChange={handleDmgRtnInputChange}
+                                                    value={damageDetails.invoiceNo}
+                                                />
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-col sm:flex-row">
+                                                <div className="w-full sm:pr-2 mb-4">
+                                                <label htmlFor="damageTotal" className="block text-sm font-medium text-white">
+                                                        Damage Amount to update
+                                                    </label>
+                                                    <input
+                                                        type="number"
+                                                        name="damageTotal"
+                                                        id="damageTotal"
+                                                        onChange={handleDmgRtnInputChange}
+                                                        value={damageDetails.damageTotal}
+                                                        className="mt-1 p-2 w-full border border-blue-500 rounded-md"
+                                                    />
+                                                </div>
+                                            </div>
+                                                </>
+
+                                            ) : (
+                                                <>
+                                                <div className="w-full sm:pr-2 mb-4">
+                                                <label htmlFor="date" className="block text-sm font-medium text-white">
+                                                    Returns Date
+                                                </label>
+                                                <input
+                                                    type="date"
+                                                    name="date"
+                                                    id="date"
+                                                    className="mt-1 p-2 w-full border border-blue-500 rounded-md"
+                                                    onChange={handleDmgRtnInputChange}
+                                                    value={returnDetails.date}
+                                                />
+                                            </div>
+                                            <div className="flex flex-col sm:flex-row">
+                                                <div className="w-full sm:pr-2 mb-4">
+                                                <label htmlFor="invoiceNo" className="block text-sm font-medium text-white">
+                                                    Invoice No related to the returns
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    name="invoiceNo"
+                                                    id="invoiceNo"
+                                                    className="mt-1 p-2 w-full border border-blue-500 rounded-md"
+                                                    onChange={handleDmgRtnInputChange}
+                                                    value={returnDetails.invoiceNo}
+                                                />
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-col sm:flex-row">
+                                                <div className="w-full sm:pr-2 mb-4">
+                                                <label htmlFor="returnNo" className="block text-sm font-medium text-white">
+                                                    Returns No.
+                                                </label>
+                                                <input
+                                                    type="text"
+                                                    name="returnNo"
+                                                    id="returnNo"
+                                                    className="mt-1 p-2 w-full border border-blue-500 rounded-md"
+                                                    onChange={handleDmgRtnInputChange}
+                                                    value={returnDetails.returnNo}
+                                                />
+                                                </div>
+                                            </div>
+                                            <div className="flex flex-col sm:flex-row">
+                                                <div className="w-full sm:pr-2 mb-4">
+                                                <label htmlFor="returnTotal" className="block text-sm font-medium text-white">
+                                                        Returns Amount to update
+                                                    </label>
+                                                    <input
+                                                        type="number"
+                                                        name="returnTotal"
+                                                        id="returnTotal"
+                                                        onChange={handleDmgRtnInputChange}
+                                                        value={returnDetails.returnTotal}
+                                                        className="mt-1 p-2 w-full border border-blue-500 rounded-md"
+                                                    />
+                                                </div>
+                                            </div>
+                                                </>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div className="bg-gray-700 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                                <button
+                                    onClick={recordDmgRtn}
+                                    type="button"
+                                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-blue-600 text-base font-medium text-white hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 sm:ml-3 sm:w-auto sm:text-sm"
+                                >
+                                    Save
+                                </button>
+                                <button
+                                    onClick={() => handleDmgRtnClose()}
                                     type="button"
                                     className="mt-3 w-full inline-flex justify-center rounded-md shadow-sm px-4 py-2 bg-red-500 text-base font-medium text-white hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
                                 >

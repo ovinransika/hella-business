@@ -19,7 +19,7 @@ export default function RootLayout({
     <html lang="en">
       <body className={inter.className}>
         <SideNavBar />
-        <div className="mt-32 ml-80 mr-16 mb-16">
+        <div className="mt-32 ml-64 mr-16 mb-16">
           {children}
         </div>
       </body>
