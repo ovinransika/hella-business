@@ -220,6 +220,8 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
                                     paymentRemark: cashPaymentDetails.paymentRemark,
                                     timestamp: new Date(),
                                 });
+                                
+                            window.location.reload();
                             }
                         } else {
                             if (chequePaymentDetails.chqPaymentDate === '' || chequePaymentDetails.chqNo === '' || chequePaymentDetails.chqIssuedBank === '' || chequePaymentDetails.chequePaymentAmount === '') {
@@ -252,7 +254,8 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
                                     });
                             }
                         }
-        
+                        
+                        window.location.reload();
                         remainingPayment -= paymentToApply;
                     }
         
@@ -265,7 +268,7 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
                         await setDoc(supplierRef, { totalDue: newTotalDue }, { merge: true });
                     }
         
-                    //window.location.reload();
+                    window.location.reload();
                 } catch (error) {
                     console.log('Error processing payment:', error);
                 }

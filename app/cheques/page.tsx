@@ -9,6 +9,28 @@ const Cheques = () => {
     const [cheques, setCheques] = useState<any[]>([]); // Define type as any[] for simplicity
     const [searchTerm, setSearchTerm] = useState('');
 
+    const [currentPage, setCurrentPage] = useState(1);
+
+    const itemsPerPage = 10;
+
+    // Filter cheques based on search term
+    const filteredCheques = cheques.filter(cheque =>
+        cheque.chqSupplierName.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+
+    const totalPages = Math.ceil(filteredCheques.length / itemsPerPage);
+
+    const getCurrentPageData = () => {
+        const startIndex = (currentPage - 1) * itemsPerPage;
+        const endIndex = startIndex + itemsPerPage;
+        return filteredCheques.slice(startIndex, endIndex);
+    }
+
+    const handlePageChange = (page: number) => {
+        setCurrentPage(page);
+    }
+
+
     useEffect(() => {
         if (user) {
             getCheques();
@@ -28,11 +50,7 @@ const Cheques = () => {
         setCheques(chequeList);
     }
 
-    // Filter cheques based on search term
-    const filteredCheques = cheques.filter(cheque =>
-        cheque.chqSupplierName.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-
+    
     return (
         <div>
             <div className="container mx-auto mt-8">
@@ -71,30 +89,44 @@ const Cheques = () => {
                             </tr>
                         </thead>
                         <tbody className="bg-gray-800 divide-y divide-gray-200 font-semibold">
-                            {filteredCheques.map(cheque => (
-                                <tr key={cheque.id}>
-                                    <td className="px-6 py-4 whitespace-nowrap text-blue-500">
-                                        {cheque.chqNo}
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        {cheque.chqIssueDate}
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        {cheque.chqIssuedBank}
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        {cheque.chqSupplierName}
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-red-500">
-                                        {cheque.chqRealizeDate}
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-lime-500">
-                                        {cheque.chqAmount}
-                                    </td>
-                                </tr>
-                            ))}
+                        {getCurrentPageData().map((item, index) => (
+                            <tr key={item.id}>
+                                <td className="px-6 py-4 whitespace-nowrap text-blue-500">
+                                    {item.chqNo}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                    {item.chqIssueDate}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                    {item.chqIssuedBank}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                    {item.chqSupplierName}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-red-500">
+                                    {item.chqRealizeDate}
+                                </td>
+                                <td className="px-6 py-4 whitespace-nowrap text-lime-500">
+                                    {item.chqAmount}
+                                </td>
+                            </tr>
+                        ))}
                         </tbody>
                     </table>
+                    {/* Pagination */}
+                    <div className="mt-5">
+                        {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                            <button
+                                key={page}
+                                className={`px-3 py-1 mx-1 rounded ${
+                                    currentPage === page ? 'bg-white text-black' : 'bg-gray-800 text-white'
+                                }`}
+                                onClick={() => handlePageChange(page)}
+                            >
+                                {page}
+                            </button>
+                        ))}
+                    </div>
                 </div>
             </div>
         </div>

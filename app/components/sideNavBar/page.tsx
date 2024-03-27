@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link';
 import React, { useEffect, useState } from 'react';
-import { getDoc, doc } from 'firebase/firestore';
+import { getDoc, doc, collection, getDocs } from 'firebase/firestore';
 import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, firestore } from '@/app/firebase/config';
 
@@ -10,6 +10,28 @@ const SideNavBar = () => {
     const [user, loading, error] = useAuthState(auth);
     const [username, setUsername] = useState('');
     const [showDropdown, setShowDropdown] = useState(false);
+
+    //Fetch the number of cheques in the database
+    const [cheques, setCheques] = useState<any[]>([]);
+
+    useEffect(() => {
+        if (user) {
+            getCheques();
+        }
+    }, [user]);
+
+    const getCheques = async () => {
+        if (!user) return;
+
+        const chequeCollection = collection(firestore, `users/${user.uid}/Cheques`);
+        const chequeSnapshot = await getDocs(chequeCollection);
+        const chequeList = chequeSnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        }));
+        setCheques(chequeList);
+    }
+        
 
     useEffect(() => {
         if (user) {
@@ -182,7 +204,9 @@ const SideNavBar = () => {
                                     <path d="m17.418 3.623-.018-.008a6.713 6.713 0 0 0-2.4-.569V2h1a1 1 0 1 0 0-2h-2a1 1 0 0 0-1 1v2H9.89A6.977 6.977 0 0 1 12 8v5h-2V8A5 5 0 1 0 0 8v6a1 1 0 0 0 1 1h8v4a1 1 0 0 0 1 1h2a1 1 0 0 0 1-1v-4h6a1 1 0 0 0 1-1V8a5 5 0 0 0-2.582-4.377ZM6 12H4a1 1 0 0 1 0-2h2a1 1 0 0 1 0 2Z" />
                                 </svg>
                                 <span className="flex-1 ms-3 whitespace-nowrap">Cheques</span>
-                                <span className="inline-flex items-center justify-center w-3 h-3 p-3 ms-3 text-sm font-medium text-blue-800 bg-blue-100 rounded-full dark:bg-blue-900 dark:text-blue-300">3</span>
+                                <span className="inline-flex items-center justify-center w-3 h-3 p-3 ms-3 text-sm font-medium text-blue-800 bg-blue-100 rounded-full dark:bg-blue-900 dark:text-blue-300">
+                                    {cheques.length}
+                                </span>
                             </Link>
                         </li>
                         <li>
