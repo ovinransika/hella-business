@@ -7,6 +7,7 @@ import SupplierReturns from "@/app/components/supplierReturns/page";
 import SupplierTransactions from "@/app/components/supplierTransactions/page";
 import SupplierTransactions2 from "@/app/components/supplierTransactions2/page";
 import SupplierPayments from "@/app/components/supplierPayments/page";
+import SupplierDamage from "@/app/components/supplierDamage/page";
 
 export default function SupplierDetails({ params }: { params: { supplierId: string } }) {
     const [user] = useAuthState(auth);
@@ -145,6 +146,14 @@ export default function SupplierDetails({ params }: { params: { supplierId: stri
 
             <div>
                 <SupplierPayments params={{ supplierId: params.supplierId }} />
+            </div>
+
+            <div>
+                <SupplierDamage params={{ supplierId: params.supplierId }} />
+            </div>
+
+            <div>
+                <SupplierReturns params={{ supplierId: params.supplierId }} />
             </div>
 
             {editModalOpen && (

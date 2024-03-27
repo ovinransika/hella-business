@@ -4,27 +4,27 @@ import { useAuthState } from 'react-firebase-hooks/auth';
 import { auth, firestore } from '@/app/firebase/config';
 import { collection, addDoc, getDocs, doc, getDoc, setDoc, query, orderBy, deleteDoc, updateDoc } from 'firebase/firestore';;
 
-const SupplierReturns = ({ params }: { params: { supplierId: string } }) => {
+const SupplierDamage = ({ params }: { params: { supplierId: string } }) => {
 
     const [user] = useAuthState(auth);
     const [loading, setLoading] = useState(true);
-    const [returns, setReturns] = useState<any[]>([]); // Update the type of returns to any[]
-    const [totalReturns, setTotalReturns] = useState(0);
+    const [damages, setDamages] = useState<any[]>([]); // Update the type of damages to any[]
+    const [totalDamages, setTotalDamages] = useState(0);
 
     const [searchDateOne, setSearchDateOne] = useState('');
     const [searchDateTwo, setSearchDateTwo] = useState('');
     const [currentPage, setCurrentPage] = useState(1);
 
-    const transactionsFilteredByDate = returns.filter((returnsData) => {
+    const transactionsFilteredByDate = damages.filter((damage) => {
         if (searchDateOne === '' || searchDateTwo === '') {
-            return returnsData;
-        } else if (returnsData.date != '') {
-            return returnsData.date >= searchDateOne && returnsData.date <= searchDateTwo
+            return damage;
+        } else if (damage.date != '') {
+            return damage.date >= searchDateOne && damage.date <= searchDateTwo
         } 
     });
 
     const itemsPerPage = 10;
-    const totalPages = Math.ceil(returns.length / itemsPerPage);
+    const totalPages = Math.ceil(damages.length / itemsPerPage);
 
     const getCurrentPageData = () => {
         const startIndex = (currentPage - 1) * itemsPerPage;
@@ -36,47 +36,47 @@ const SupplierReturns = ({ params }: { params: { supplierId: string } }) => {
         setCurrentPage(page);
     }
 
-    const fetchReturnRecords = async () => {
+    const fetchDamageRecords = async () => {
 
-        //Get totalReturns of the supplier
+        // Get totalDamages of the supplier
         const supplierRef = doc(firestore, `users/${user?.uid}/Suppliers/${params.supplierId}`);
         const supplierSnap = await getDoc(supplierRef);
         const supplierData = supplierSnap.data();
-        setTotalReturns(supplierData?.totalReturns);
+        setTotalDamages(supplierData?.totalDamage);
 
-        // Get all return records for the supplier
-        const returnRef = collection(firestore, `users/${user?.uid}/Suppliers/${params.supplierId}/Returns`);
-        const returnQuery = query(returnRef, orderBy('date', 'asc'));
+        // Get all damage records for the supplier
+        const damageRef = collection(firestore, `users/${user?.uid}/Suppliers/${params.supplierId}/Damages`);
+        const damageQuery = query(damageRef, orderBy('date', 'asc'));
 
-        const damageSnapshot = await getDocs(returnQuery);
-        let allReturnsArray: any[] = [];
+        const damageSnapshot = await getDocs(damageQuery);
+        let allDamagesArray: any[] = [];
 
-        //get all return records without for loop
-        allReturnsArray = damageSnapshot.docs.map(doc => ({
+        //get all damage records without for loop
+        allDamagesArray = damageSnapshot.docs.map(doc => ({
             id: doc.id,
             ...doc.data()
         }));
 
-        setReturns(allReturnsArray);
-        console.log(allReturnsArray);
+        setDamages(allDamagesArray);
+        console.log(allDamagesArray);
 
     }
 
 
     useEffect(() => {
-        fetchReturnRecords();
+        fetchDamageRecords();
     }, []);
 
   return (
     <div>
         <div style={{ borderRadius: '10px' }} className="mt-10 p-10 bg-neutral-700">
-            <h1 className="text-2xl font-bold text-white">All Return Records for Supplier</h1>
-            {returns.length === 0 ? (
-                <p className="text-white font-semibold">No return records found!</p>
+            <h1 className="text-2xl font-bold text-white">All Damage Records for Supplier</h1>
+            {damages.length === 0 ? (
+                <p className="text-white font-semibold">No damage records found!</p>
             ) :
                 <>
                 <div className="mt-5">
-                    <h1 className="text-xl font-bold text-red-500 mb-5">Total Returns: Rs.{totalReturns}</h1>
+                    <h1 className="text-xl font-bold text-red-500 mb-5">Total Damages: Rs.{totalDamages}</h1>
                 <div className="flex gap-4 mb-5">
                             <div className="flex flex-col">
                                 <label htmlFor="searchDateOne" className="block text-sm font-medium text-white">
@@ -109,9 +109,8 @@ const SupplierReturns = ({ params }: { params: { supplierId: string } }) => {
                         <thead>
                             <tr>
                                 <th className="px-4 py-2 border-2 border-black bg-blue-600 hidden sm:table-cell">Recorded Date</th>
-                                <th className="px-4 py-2 border-2 border-black bg-blue-600 hidden sm:table-cell">Return for Invoice No.</th>
-                                <th className="px-4 py-2 border-2 border-black bg-blue-600 hidden sm:table-cell">Return No.</th>
-                                <th className="px-4 py-2 border-2 border-black bg-blue-600 hidden sm:table-cell">Return Total</th>
+                                <th className="px-4 py-2 border-2 border-black bg-blue-600 hidden sm:table-cell">Damage for Invoice No.</th>
+                                <th className="px-4 py-2 border-2 border-black bg-blue-600 hidden sm:table-cell">Damage Total</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -119,8 +118,7 @@ const SupplierReturns = ({ params }: { params: { supplierId: string } }) => {
                                     <tr key={index}>
                                         <td className="px-4 py-2 border-2 border-black">{item.date}</td>
                                         <td className="px-4 py-2 border-2 border-black">{item.invoiceNo}</td>
-                                        <td className="px-4 py-2 border-2 border-black">{item.returnNo}</td>
-                                        <td className="px-4 py-2 border-2 border-black">Rs.{item.returnTotal}</td>
+                                        <td className="px-4 py-2 border-2 border-black">Rs.{item.damageTotal}</td>
                                     </tr>
                                 ))}
                         </tbody>
@@ -147,4 +145,4 @@ const SupplierReturns = ({ params }: { params: { supplierId: string } }) => {
   )
 }
 
-export default SupplierReturns;
+export default SupplierDamage;

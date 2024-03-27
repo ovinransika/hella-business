@@ -67,7 +67,9 @@ const AddSuppliers = () => {
                 contactNo: supplierContactNo,
                 email: supplierEmail,
                 totalDue: '0',
-                cmbSupplier: cmbSupplier
+                totalReturns: '0',
+                totalDamage: '0',
+                cmbSupplier: cmbSupplier,
             });
 
             if (docRef) {

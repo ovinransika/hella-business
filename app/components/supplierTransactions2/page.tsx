@@ -87,6 +87,13 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
             return;
         }
 
+        //get supplier totalDamage and totalReturns
+        const supplierRef = doc(firestore, `users/${user?.uid}/Suppliers/${params.supplierId}`);
+        const supplierDoc = await getDoc(supplierRef);
+        const supplierData = supplierDoc.data();
+        const totalDamage = supplierData?.totalDamage;
+        const totalReturns = supplierData?.totalReturns;
+
         try{
             const timestamp = new Date();
 
@@ -106,6 +113,35 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
                 if (supplierDoc.exists()) {
                     const newTotalDue = Number(supplierDoc.data().totalDue) + Number(transactionDetails.balance);
                     await setDoc(supplierRef, { totalDue: newTotalDue }, { merge: true });
+                }
+
+                if(Number(transactionDetails.returnTotal) > 0){
+                    const returnsRef = collection(firestore, `users/${user.uid}/Suppliers/${params.supplierId}/Returns`);
+                    await addDoc(returnsRef, {
+                        date: transactionDetails.date,
+                        invoiceNo: transactionDetails.invoiceNo,
+                        returnNo: transactionDetails.returnNo,
+                        returnTotal: transactionDetails.returnTotal,
+                        timestamp: timestamp,
+                    });
+
+                    //Add the returnTotal to the supplier's totalReturns
+                    const newTotalReturns = Number(totalReturns) + Number(transactionDetails.returnTotal);
+                    await setDoc(supplierRef, { totalReturns: newTotalReturns }, { merge: true });
+                }
+
+                if(Number(transactionDetails.damageTotal) > 0){
+                    const damagesRef = collection(firestore, `users/${user.uid}/Suppliers/${params.supplierId}/Damages`);
+                    await addDoc(damagesRef, {
+                        date: transactionDetails.date,
+                        invoiceNo: transactionDetails.invoiceNo,
+                        damageTotal: transactionDetails.damageTotal,
+                        timestamp: timestamp,
+                    });
+
+                    //Add the damageTotal to the supplier's totalDamage
+                    const newTotalDamage = Number(totalDamage) + Number(transactionDetails.damageTotal);
+                    await setDoc(supplierRef, { totalDamage: newTotalDamage }, { merge: true });
                 }
             }
 
@@ -709,7 +745,7 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
                         </div>
                     </div>
                     <div className='flex w-1/3 mb-5 items-center'>
-                        <p className="text-white font-semibold">Total Due: Rs.{totalDueToPay}</p>
+                        <p className="text-xl font-bold text-red-500">Total Due: Rs.{totalDueToPay}</p>
                         <button className="bg-lime-500 hover:bg-lime-700 text-white font-bold py-2 px-4 rounded ml-auto"
                         onClick={() => handleTotalDuePayClick()}>
                             Pay Total Due
