@@ -220,8 +220,6 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
                                     paymentRemark: cashPaymentDetails.paymentRemark,
                                     timestamp: new Date(),
                                 });
-                                
-                            window.location.reload();
                             }
                         } else {
                             if (chequePaymentDetails.chqPaymentDate === '' || chequePaymentDetails.chqNo === '' || chequePaymentDetails.chqIssuedBank === '' || chequePaymentDetails.chequePaymentAmount === '') {
@@ -254,8 +252,6 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
                                     });
                             }
                         }
-                        
-                        window.location.reload();
                         remainingPayment -= paymentToApply;
                     }
         
@@ -384,6 +380,45 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
                     //Deduct the damageTotal from the supplier's totalDue
                     const newTotalDue = Number(supplierDoc.data()?.totalDue) - Number(damageDetails.damageTotal);
                     await setDoc(supplierRef, { totalDue: newTotalDue }, { merge: true });
+
+                    //Deduct the damage total from the trasaction related to the invoiceNo, if the invoiceNo does not exist, deduct from oldest transactions outstanding balance
+                    const transactionsRef = collection(firestore, `users/${user.uid}/Suppliers/${params.supplierId}/Transactions`);
+                    const transactionsQuery = query(transactionsRef, orderBy('date', 'asc'));
+                    const querySnapshot = await getDocs(transactionsQuery);
+                    let remainingDamage = Number(damageDetails.damageTotal);
+
+                        for (const transactionDoc of querySnapshot.docs) {
+                            const transactionData = transactionDoc.data();
+                            const invoiceNo = transactionData.invoiceNo;
+                            const outstandingBalance = Number(transactionData.outstandingBalance);
+    
+                            //If the invoiceNo matches, deduct the damage from the transaction
+                            if (invoiceNo === damageDetails.invoiceNo) {
+                                if (remainingDamage <= 0) {
+                                    break;
+                                }else{
+                                    let damageToDeduct = Math.min(outstandingBalance, remainingDamage);
+                                    const transactionRef = doc(firestore, `users/${user.uid}/Suppliers/${params.supplierId}/Transactions/${transactionDoc.id}`);
+                                    await updateDoc(transactionRef, {
+                                        outstandingBalance: outstandingBalance - damageToDeduct,
+                                    });
+                                    remainingDamage -= damageToDeduct;
+                                }
+                                
+                            } else {
+                                //Deduct the damage from the oldest transaction
+                                if (remainingDamage <= 0) {
+                                    break;
+                                }
+                                let damageToDeduct = Math.min(outstandingBalance, remainingDamage);
+                                const transactionRef = doc(firestore, `users/${user.uid}/Suppliers/${params.supplierId}/Transactions/${transactionDoc.id}`);
+                                await updateDoc(transactionRef, {
+                                    outstandingBalance: outstandingBalance - damageToDeduct,
+                                });
+                                remainingDamage -= damageToDeduct;
+                            }
+                        }
+                    
                 }
             } else {
                 if (!returnDetails.date || !returnDetails.invoiceNo || !returnDetails.returnNo || !returnDetails.returnTotal) {
@@ -407,6 +442,44 @@ const SupplierTransactions2 = ({ params }: { params: { supplierId: string } }) =
                     //Deduct the returnTotal from the supplier's totalDue
                     const newTotalDue = Number(supplierDoc.data()?.totalDue) - Number(returnDetails.returnTotal);
                     await setDoc(supplierRef, { totalDue: newTotalDue }, { merge: true });
+
+                    //Deduct the damage total from the trasaction related to the invoiceNo, if the invoiceNo does not exist, deduct from oldest transactions outstanding balance
+                    const transactionsRef = collection(firestore, `users/${user.uid}/Suppliers/${params.supplierId}/Transactions`);
+                    const transactionsQuery = query(transactionsRef, orderBy('date', 'asc'));
+                    const querySnapshot = await getDocs(transactionsQuery);
+                    let remainingReturn = Number(returnDetails.returnTotal);
+
+                    for (const transactionDoc of querySnapshot.docs) {
+                        const transactionData = transactionDoc.data();
+                        const invoiceNo = transactionData.invoiceNo;
+                        const outstandingBalance = Number(transactionData.outstandingBalance);
+
+                        //If the invoiceNo matches, deduct the damage from the transaction
+                        if (invoiceNo === returnDetails.invoiceNo) {
+                            if (remainingReturn <= 0) {
+                                break;
+                            }else{
+                                let returnToDeduct = Math.min(outstandingBalance, remainingReturn);
+                                const transactionRef = doc(firestore, `users/${user.uid}/Suppliers/${params.supplierId}/Transactions/${transactionDoc.id}`);
+                                await updateDoc(transactionRef, {
+                                    outstandingBalance: outstandingBalance - returnToDeduct,
+                                });
+                                remainingReturn -= returnToDeduct;
+                            }
+                            
+                        } else{
+                            //Deduct the damage from the oldest transaction
+                            if (remainingReturn <= 0) {
+                                break;
+                            }
+                            let returnToDeduct = Math.min(outstandingBalance, remainingReturn);
+                            const transactionRef = doc(firestore, `users/${user.uid}/Suppliers/${params.supplierId}/Transactions/${transactionDoc.id}`);
+                            await updateDoc(transactionRef, {
+                                outstandingBalance: outstandingBalance - returnToDeduct,
+                            });
+                            remainingReturn -= returnToDeduct;
+                        }
+                    }
                 }
             }
             window.location.reload();
